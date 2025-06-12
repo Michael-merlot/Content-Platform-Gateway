@@ -1,8 +1,11 @@
 using Gateway.Api.Middleware;
 using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Interfaces.History;
+using Gateway.Core.Services.History;
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Logging;
 using Gateway.Infrastructure.Monitoring;
+using Gateway.Infrastructure.Persistence.tempDB;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Collections.Generic;
@@ -15,8 +18,14 @@ builder.Host.UseSerilog((context, logConfig) =>
         .ReadFrom.Configuration(context.Configuration)
         .WriteTo.Console());
 
+builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
+builder.Services.AddScoped<IHistoryService, HistoryService>();/////////////////////IhistoryRepository
+
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -59,7 +68,7 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            new string[] { }
+            []
         }
     });
 
