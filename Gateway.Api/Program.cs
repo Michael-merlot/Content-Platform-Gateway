@@ -1,12 +1,18 @@
 using Gateway.Api.Middleware;
+using Gateway.Api.Options;
 using Gateway.Core.Interfaces.Clients;
 using Gateway.Infrastructure.Clients;
-using Gateway.Infrastructure.Logging;
 using Gateway.Infrastructure.Monitoring;
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+
 using Serilog;
-using System.Collections.Generic;
+
 using System.Reflection;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +21,33 @@ builder.Host.UseSerilog((context, logConfig) =>
         .ReadFrom.Configuration(context.Configuration)
         .WriteTo.Console());
 
+builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
+
 builder.Services.AddControllers();
+
+builder.Services
+    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<AuthOptions>>((options, authOptions) =>
+    {
+        RSA rsa = RSA.Create(); // Disposal is not needed
+        rsa.ImportFromPem(authOptions.Value.PublicKeyPem);
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = authOptions.Value.Issuer,
+            ValidAudience = authOptions.Value.Audience,
+            IssuerSigningKey = new RsaSecurityKey(rsa),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    })
+    .Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
