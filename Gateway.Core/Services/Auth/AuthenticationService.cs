@@ -5,7 +5,7 @@ using Gateway.Core.Models.Auth;
 namespace Gateway.Core.Services.Auth;
 
 /// <inheritdoc/>
-internal class AuthenticationService : IAuthenticationService
+public class AuthenticationService : IAuthenticationService
 {
     private readonly ILaravelApiClient _apiClient;
 
