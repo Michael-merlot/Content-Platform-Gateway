@@ -12,7 +12,6 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 
 using System.Reflection;
-using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,8 +28,10 @@ builder.Services
     .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<IOptions<AuthOptions>>((options, authOptions) =>
     {
-        RSA rsa = RSA.Create(); // Disposal is not needed
-        rsa.ImportFromPem(authOptions.Value.PublicKeyPem);
+        if (builder.Environment.IsDevelopment())
+            options.RequireHttpsMetadata = false;
+
+        options.Authority = authOptions.Value.Authority;
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -38,9 +39,6 @@ builder.Services
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = authOptions.Value.Issuer,
-            ValidAudience = authOptions.Value.Audience,
-            IssuerSigningKey = new RsaSecurityKey(rsa),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
     })
