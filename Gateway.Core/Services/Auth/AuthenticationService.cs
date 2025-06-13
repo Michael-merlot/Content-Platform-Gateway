@@ -13,9 +13,13 @@ public class AuthenticationService : IAuthenticationService
         _apiClient = apiClient;
 
     /// <inheritdoc/>
-    public async Task<AuthResult<AuthTokenSession>>
-        LoginAsync(string email, string password, CancellationToken cancellationToken = default) =>
+    public async Task<AuthResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default) =>
         await _apiClient.LoginAsync(email, password, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(string userId, string code,
+        CancellationToken cancellationToken = default) =>
+        await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
 
     /// <inheritdoc/>
     public async Task<AuthResult<AuthTokenSession>> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>

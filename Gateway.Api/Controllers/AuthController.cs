@@ -17,22 +17,70 @@ namespace Gateway.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthenticationService authenticationService) =>
+    public AuthController(IAuthenticationService authenticationService, ILogger<AuthController> logger)
+    {
         _authenticationService = authenticationService;
+        _logger = logger;
+    }
 
     /// <summary>Authenticates the user</summary>
     /// <param name="loginRequest">Login request</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Authentication tokens</returns>
     [HttpPost]
-    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
+    [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> Login(LoginRequest loginRequest, CancellationToken cancellationToken = default)
     {
-        AuthResult<AuthTokenSession> result = await _authenticationService
+        AuthResult<LoginResult> result = await _authenticationService
             .LoginAsync(loginRequest.Email, loginRequest.Password, cancellationToken);
+
+        if (!result.IsSuccess)
+            return result.AsProblemDetails(this);
+
+        switch (result.Data!.MfaRequired)
+        {
+            case true when result.Data.MfaVerificationRequiredMetadata is not null:
+            {
+                return Ok(result.Data.MfaVerificationRequiredMetadata.MapToMfaRequiredResponse());
+            }
+            case false when result.Data.AuthTokenSession is not null:
+            {
+                return Ok(result.Data.AuthTokenSession.MapToAuthResponse());
+            }
+            default:
+            {
+                _logger.LogError("Invalid login response was received. " +
+                    "MfaRequired: {MfaRequired}; " +
+                    "AuthTokenSession: {AuthTokenSessionIsNull}; " +
+                    "MfaVerificationRequiredMetadata: {MfaVerificationRequiredMetadataIsNull}",
+                    result.Data.MfaRequired,
+                    result.Data.AuthTokenSession is null,
+                    result.Data.MfaVerificationRequiredMetadata is null);
+
+                return Problem(statusCode: StatusCodes.Status500InternalServerError,
+                    title: "Unknown error",
+                    detail: "Unknown error while verifying the authentication result");
+            }
+        }
+    }
+
+    /// <summary>Verifies the MFA</summary>
+    /// <param name="verifyMfaRequest">MFA verification request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Authentication tokens</returns>
+    [HttpPost]
+    [ActionName("verify/mfa")]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
+    public async Task<IActionResult> VerifyMfa(VerifyMfaRequest verifyMfaRequest, CancellationToken cancellationToken = default)
+    {
+        AuthResult<AuthTokenSession> result = await _authenticationService
+            .VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, cancellationToken);
 
         return result.IsSuccess ? Ok(result.Data!.MapToAuthResponse()) : result.AsProblemDetails(this);
     }

@@ -71,6 +71,12 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 
+    c.UseAllOfForInheritance();
+    c.UseOneOfForPolymorphism();
+
+    c.SelectSubTypesUsing(baseType =>
+        typeof(Program).Assembly.GetTypes().Where(type => type.IsSubclassOf(baseType)));
+
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = @"JWT авторизация. Введите 'Bearer' [пробел] и ваш токен.",

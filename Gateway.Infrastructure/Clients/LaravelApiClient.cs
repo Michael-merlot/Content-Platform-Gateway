@@ -30,8 +30,13 @@ namespace Gateway.Infrastructure.Clients
         }
 
         /// <inheritdoc/>
-        public async Task<AuthResult<AuthTokenSession>>
+        public async Task<AuthResult<LoginResult>>
             LoginAsync(string email, string password, CancellationToken cancellationToken = default) =>
+            throw new NotImplementedException();
+
+        /// <inheritdoc/>
+        public async Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(string userId, string code,
+            CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
         /// <inheritdoc/>

@@ -13,6 +13,9 @@ public static class AuthMapper
     public static AuthResponse MapToAuthResponse(this AuthTokenSession authTokenSession) =>
         new(authTokenSession.AccessToken, authTokenSession.RefreshToken, authTokenSession.ExpiresIn, authTokenSession.TokenType);
 
+    public static MfaRequiredResponse MapToMfaRequiredResponse(this MfaVerificationMetadata mfaVerificationMetadata) =>
+        new(mfaVerificationMetadata.UserId);
+
     /// <summary>Constructs <see cref="IActionResult"/> with problem details from the <see cref="AuthResult"/></summary>
     /// <param name="result">The <see cref="AuthResult"/> to construct from</param>
     /// <param name="controller">The controller from which the problem details will be constructed</param>

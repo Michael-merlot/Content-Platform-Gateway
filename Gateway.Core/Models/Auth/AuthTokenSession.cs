@@ -7,7 +7,7 @@ namespace Gateway.Core.Models.Auth;
 /// <param name="RefreshToken">Refresh token</param>
 /// <param name="ExpiresIn">The time it expires in</param>
 /// <param name="TokenType">Token type</param>
-public record AuthTokenSession(
+public sealed record AuthTokenSession(
     string AccessToken,
     string RefreshToken,
     int ExpiresIn,

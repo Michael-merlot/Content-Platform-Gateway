@@ -11,7 +11,15 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="password">User password</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Authentication result</returns>
-        Task<AuthResult<AuthTokenSession>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
+        Task<AuthResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
+
+        /// <summary>Verifies MFA code</summary>
+        /// <param name="userId">User ID for whom to verify the code</param>
+        /// <param name="code">The code to verify</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns></returns>
+        Task<AuthResult<AuthTokenSession>>
+            VerifyMultiFactorAsync(string userId, string code, CancellationToken cancellationToken = default);
 
         /// <summary>Refreshes the session</summary>
         /// <param name="refreshToken">Refresh token</param>
