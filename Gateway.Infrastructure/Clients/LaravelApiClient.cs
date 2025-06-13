@@ -29,26 +29,16 @@ namespace Gateway.Infrastructure.Clients
             }
         }
 
-        /// <summary>Authenticates the user</summary>
-        /// <param name="email">User e-mail</param>
-        /// <param name="password">User password</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Authentication result</returns>
+        /// <inheritdoc/>
         public async Task<AuthResult<AuthTokenSession>>
             LoginAsync(string email, string password, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
-        /// <summary>Refreshes the session</summary>
-        /// <param name="refreshToken">Refresh token</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Refresh token result</returns>
+        /// <inheritdoc/>
         public async Task<AuthResult<AuthTokenSession>> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
 
-        /// <summary>Logs the user out</summary>
-        /// <param name="accessToken">Access token</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Whether the log out completed successfully</returns>
+        /// <inheritdoc/>
         public async Task<AuthResult> LogoutAsync(string accessToken, CancellationToken cancellationToken = default) =>
             throw new NotImplementedException();
     }
