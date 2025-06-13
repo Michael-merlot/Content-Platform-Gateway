@@ -24,10 +24,10 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Content Platform Gateway API",
         Version = "v1",
-        Description = "API Gateway для обеспечения доступа к сервисам контент-платформы",
+        Description = "API Gateway РґР»СЏ РѕР±РµСЃРїРµС‡РµРЅРёСЏ РґРѕСЃС‚СѓРїР° Рє СЃРµСЂРІРёСЃР°Рј РєРѕРЅС‚РµРЅС‚-РїР»Р°С‚С„РѕСЂРјС‹",
         Contact = new OpenApiContact
         {
-            Name = "Команда разработки",
+            Name = "РљРѕРјР°РЅРґР° СЂР°Р·СЂР°Р±РѕС‚РєРё",
             Email = "yandex@mail.ru"
         }
     });
@@ -41,7 +41,7 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = @"JWT авторизация. Введите 'Bearer' [пробел] и ваш токен.",
+        Description = @"JWT Р°РІС‚РѕСЂРёР·Р°С†РёСЏ. Р’РІРµРґРёС‚Рµ 'Bearer' [РїСЂРѕР±РµР»] Рё РІР°С€ С‚РѕРєРµРЅ.",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
