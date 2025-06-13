@@ -1,6 +1,8 @@
 using Gateway.Api.Middleware;
 using Gateway.Api.Options;
+using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Services.Auth;
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Monitoring;
 
@@ -108,6 +110,8 @@ builder.Services.AddHttpClient<IAiServicesClient, AiServicesClient>(client =>
     client.BaseAddress = new Uri(builder.Configuration["ExternalServices:PythonAiServices"] ?? "http://localhost:5000");
     client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
+
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 builder.Services.AddSingleton<MetricsReporter>();
 
