@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Gateway.Core.Models.History;
 
 namespace Gateway.Core.Interfaces.History
 {
-    internal class IHistoryService
+    public interface IHistoryService 
     {
+        Task<HistoryItem> AddHistoryItemAsync(HistoryItem historyItem);
+
+        Task<IEnumerable<HistoryItem>> GetUserHistoryAsync(Guid userId, ContentType? contentType = null);
     }
 }
