@@ -1,4 +1,4 @@
-﻿using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Interfaces.Clients;
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Logging;
 using Gateway.Infrastructure.Persistence.Redis;
@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.Extensions.Http;
 using Polly.Timeout;
+using Gateway.Core.Interfaces.Persistence;
 
 
 namespace Gateway.Infrastructure.Extensions
@@ -68,6 +69,7 @@ namespace Gateway.Infrastructure.Extensions
                 ConnectionMultiplexer.Connect(redisConnectionString));
 
             services.AddScoped<IRedisRepository, RedisRepository>();
+            services.AddScoped<ICacheRepository, RedisRepository>();
 
             return services;
         }
