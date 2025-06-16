@@ -42,7 +42,11 @@ public class HistoryRepository : IHistoryRepository
         return Task.FromResult(historyItem); // Может вернуть null, если не найдено
     }
 
-    public Task<IEnumerable<HistoryItem>> GetByUserIdAsync(Guid userId, ContentType? contentType = null, int skip = 0, int take = 50)
+    public Task<IEnumerable<HistoryItem>> GetByUserIdAsync(
+        Guid userId,
+        ContentType? contentType = null,
+        int skip = 0,
+        int take = 50)
     {
         var userHistory = _historyItems.Values.Where(item => item.UserId == userId);
 
@@ -52,8 +56,8 @@ public class HistoryRepository : IHistoryRepository
         }
 
         userHistory = userHistory.OrderByDescending(item => item.ViewedAt)
-                                 .Skip(skip)
-                                 .Take(take);
+                               .Skip(skip)
+                               .Take(take);
 
         return Task.FromResult<IEnumerable<HistoryItem>>(userHistory.ToList());
     }

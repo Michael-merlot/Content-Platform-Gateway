@@ -2,11 +2,11 @@ using Gateway.Api.Models.History;
 using Gateway.Core.Interfaces.History;
 using Gateway.Core.Models.History;
 using Microsoft.AspNetCore.Mvc;
+
 namespace Gateway.Api.Controllers
 {
     [ApiController]
-    [Route("api/v1/history")]
-    // класс для общения по сети
+    [Route("api/v1/history")]  
     public class HistoryController : ControllerBase
     {
         private readonly IHistoryService _historyService;
@@ -16,7 +16,10 @@ namespace Gateway.Api.Controllers
             _historyService = historyService;
         }
 
-        [HttpPost]
+        /// <summary>
+        /// Добавляет новую запись в историю просмотров
+        /// </summary>
+        [HttpPost]  
         [ProducesResponseType(typeof(AddHistoryResponse), 201)]
         [ProducesResponseType(400)]
         public async Task<ActionResult<AddHistoryResponse>> AddHistory(AddHistoryRequest request)
@@ -48,12 +51,19 @@ namespace Gateway.Api.Controllers
             return CreatedAtAction(nameof(GetHistoryByUserId), new { userId = addedItemDto.UserId }, addedItemDto);
         }
 
-        [HttpGet("user/{userId}")]
+        /// <summary>
+        /// Получает историю просмотров пользователя по ID
+        /// </summary>
+        [HttpGet("user/{userId}")]  
+        [ProducesResponseType(typeof(IEnumerable<AddHistoryResponse>), 200)]
+        [ProducesResponseType(404)]
         public async Task<ActionResult<IEnumerable<AddHistoryResponse>>> GetHistoryByUserId(
             Guid userId,
-            [FromQuery] ContentType? contentType = null)
+            [FromQuery] ContentType? contentType = null,
+            [FromQuery] int skip = 0,
+            [FromQuery] int take = 50)  
         {
-            var historyItems = await _historyService.GetUserHistoryAsync(userId, contentType);
+            var historyItems = await _historyService.GetUserHistoryAsync(userId, contentType, skip, take);
 
             if (!historyItems.Any())
             {
