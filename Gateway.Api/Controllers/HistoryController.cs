@@ -1,11 +1,12 @@
-﻿using Gateway.Api.Models.History;
+using Gateway.Api.Models.History;
 using Gateway.Core.Interfaces.History;
 using Gateway.Core.Models.History;
 using Microsoft.AspNetCore.Mvc;
 namespace Gateway.Api.Controllers
 {
     [ApiController]
-    //класс для общения по сети
+    [Route("api/v1/history")]
+    // класс для общения по сети
     public class HistoryController : ControllerBase
     {
         private readonly IHistoryService _historyService;
@@ -15,7 +16,7 @@ namespace Gateway.Api.Controllers
             _historyService = historyService;
         }
 
-        [HttpPost("test")]
+        [HttpPost]
         [ProducesResponseType(typeof(AddHistoryResponse), 201)]
         [ProducesResponseType(400)]
         public async Task<ActionResult<AddHistoryResponse>> AddHistory(AddHistoryRequest request)
@@ -47,7 +48,7 @@ namespace Gateway.Api.Controllers
             return CreatedAtAction(nameof(GetHistoryByUserId), new { userId = addedItemDto.UserId }, addedItemDto);
         }
 
-        [HttpGet("{userId}")]
+        [HttpGet("user/{userId}")]
         public async Task<ActionResult<IEnumerable<AddHistoryResponse>>> GetHistoryByUserId(
             Guid userId,
             [FromQuery] ContentType? contentType = null)

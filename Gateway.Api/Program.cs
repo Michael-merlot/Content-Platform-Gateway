@@ -2,22 +2,16 @@ using Gateway.Api.Middleware;
 using Gateway.Api.Options;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
-<<<<<<< HEAD
 using Gateway.Core.Services.Auth;
-=======
 using Gateway.Core.Interfaces.History;
 using Gateway.Core.Services.History;
->>>>>>> origin/feature/HistoryApi
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Monitoring;
-<<<<<<< HEAD
+using Gateway.Infrastructure.Persistence.tempDB;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-=======
-using Gateway.Infrastructure.Persistence.tempDB;
->>>>>>> origin/feature/HistoryApi
 using Microsoft.OpenApi.Models;
 
 using Serilog;
@@ -31,13 +25,10 @@ builder.Host.UseSerilog((context, logConfig) =>
         .ReadFrom.Configuration(context.Configuration)
         .WriteTo.Console());
 
-<<<<<<< HEAD
 builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
-=======
-builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
-builder.Services.AddScoped<IHistoryService, HistoryService>();/////////////////////IhistoryRepository
 
->>>>>>> origin/feature/HistoryApi
+builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
+builder.Services.AddScoped<IHistoryService, HistoryService>();
 
 builder.Services.AddControllers();
 
@@ -64,8 +55,6 @@ builder.Services
     .AddJwtBearer();
 
 builder.Services.AddEndpointsApiExplorer();
-
-
 
 builder.Services.AddSwaggerGen(c =>
 {

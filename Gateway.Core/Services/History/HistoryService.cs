@@ -1,4 +1,4 @@
-﻿using Gateway.Core.Interfaces.History;
+using Gateway.Core.Interfaces.History;
 using Gateway.Core.Models.History;
 namespace Gateway.Core.Services.History
 {
@@ -19,6 +19,15 @@ namespace Gateway.Core.Services.History
         public async Task<IEnumerable<HistoryItem>> GetUserHistoryAsync(Guid userId, ContentType? contentType = null)
         {
             return await _historyRepository.GetByUserIdAsync(userId, contentType);
+        }
+
+        public async Task ClearUserHistoryAsync(Guid userId)
+        {
+            var userHistory = await _historyRepository.GetByUserIdAsync(userId);
+            foreach (var item in userHistory)
+            {
+                await _historyRepository.DeleteAsync(item.Id);
+            }
         }
     }
 }

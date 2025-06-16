@@ -1,4 +1,4 @@
-﻿using Gateway.Core.Interfaces.History;
+using Gateway.Core.Interfaces.History;
 using Gateway.Core.Models.History;
 using System;
 using System.Collections.Concurrent;
@@ -42,19 +42,18 @@ public class HistoryRepository : IHistoryRepository
         return Task.FromResult(historyItem); // Может вернуть null, если не найдено
     }
 
-    public Task<IEnumerable<HistoryItem>> GetByUserIdAsync(Guid userId, ContentType? contentType = null)
+    public Task<IEnumerable<HistoryItem>> GetByUserIdAsync(Guid userId, ContentType? contentType = null, int skip = 0, int take = 50)
     {
-        // Фильтруем историю по userId
         var userHistory = _historyItems.Values.Where(item => item.UserId == userId);
 
-        // Если указан contentType, фильтруем дополнительно
         if (contentType.HasValue && contentType.Value != ContentType.Unknown)
         {
             userHistory = userHistory.Where(item => item.ContentType == contentType.Value);
         }
 
-        // Сортируем по дате просмотра в убывающем порядке (самые новые сверху)
-        userHistory = userHistory.OrderByDescending(item => item.ViewedAt);
+        userHistory = userHistory.OrderByDescending(item => item.ViewedAt)
+                                 .Skip(skip)
+                                 .Take(take);
 
         return Task.FromResult<IEnumerable<HistoryItem>>(userHistory.ToList());
     }
@@ -70,4 +69,6 @@ public class HistoryRepository : IHistoryRepository
         );
         return Task.CompletedTask;
     }
+
+
 }
