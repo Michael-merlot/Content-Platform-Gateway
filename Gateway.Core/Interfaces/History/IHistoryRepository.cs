@@ -8,15 +8,12 @@ namespace Gateway.Core.Interfaces.History
     public interface IHistoryRepository
     {
         Task<HistoryItem> AddAsync(HistoryItem historyItem);
-
         Task<HistoryItem?> GetByIdAsync(Guid id);
-
         Task<IEnumerable<HistoryItem>> GetAllAsync();
-
         Task<IEnumerable<HistoryItem>> GetByUserIdAsync(Guid userId, ContentType? contentType = null);
-
         Task UpdateAsync(HistoryItem historyItem);
-
         Task DeleteAsync(Guid id);
+        Task<int> CountViewsByContentIdAsync(Guid contentId);
+        Task<int> CountViewsByContentTypeAsync(ContentType contentType);
     }
 }

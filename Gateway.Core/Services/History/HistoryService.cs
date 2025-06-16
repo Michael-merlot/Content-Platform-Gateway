@@ -20,5 +20,14 @@ namespace Gateway.Core.Services.History
         {
             return await _historyRepository.GetByUserIdAsync(userId, contentType);
         }
+        public async Task<int> GetViewsCountByContentIdAsync(Guid contentId)
+        {
+            return await _historyRepository.CountViewsByContentIdAsync(contentId);
+        }
+
+        public async Task<int> GetViewsCountByContentTypeAsync(ContentType contentType)
+        {
+            return await _historyRepository.CountViewsByContentTypeAsync(contentType);
+        }
     }
 }

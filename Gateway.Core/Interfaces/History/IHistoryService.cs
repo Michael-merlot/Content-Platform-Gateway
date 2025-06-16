@@ -7,5 +7,7 @@ namespace Gateway.Core.Interfaces.History
         Task<HistoryItem> AddHistoryItemAsync(HistoryItem historyItem);
 
         Task<IEnumerable<HistoryItem>> GetUserHistoryAsync(Guid userId, ContentType? contentType = null);
+        Task<int> GetViewsCountByContentIdAsync(Guid contentId);
+        Task<int> GetViewsCountByContentTypeAsync(ContentType contentType);
     }
 }

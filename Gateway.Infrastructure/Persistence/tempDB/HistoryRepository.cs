@@ -70,4 +70,18 @@ public class HistoryRepository : IHistoryRepository
         );
         return Task.CompletedTask;
     }
+
+    public Task<int> CountViewsByContentIdAsync(Guid contentId)
+    {
+        // Считаем количество записей, у которых ContentId совпадает
+        var count = _historyItems.Values.Count(item => item.ContentId == contentId);
+        return Task.FromResult(count);
+    }
+
+    public Task<int> CountViewsByContentTypeAsync(ContentType contentType)
+    {
+        // Считаем количество записей, у которых ContentType совпадает
+        var count = _historyItems.Values.Count(item => item.ContentType == contentType);
+        return Task.FromResult(count);
+    }
 }
