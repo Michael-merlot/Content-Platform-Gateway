@@ -1,4 +1,4 @@
-﻿using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Interfaces.Clients;
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Logging;
 using Gateway.Infrastructure.Persistence.Redis;
@@ -7,37 +7,32 @@ using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 using System;
 using System.Net.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.Extensions.Http;
-using Polly.Timeout;
-
+using Gateway.Core.Interfaces.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace Gateway.Infrastructure.Extensions
 {
-
     public static class ServiceCollectionExtensions
     {
         /// <summary>
-        /// регистрирует все сервисы приложения в DI контейнере
+        /// Регистрирует все сервисы приложения в DI контейнере
         /// </summary>
-        /// <param name="services">коллекция сервисов</param>
-        /// <param name="configuration">конфигурация приложения</param>
-        /// <returns>коллекция сервисов с добавленными зависимостями</returns>
+        /// <param name="services">Коллекция сервисов</param>
+        /// <param name="configuration">Конфигурация приложения</param>
+        /// <returns>Коллекция сервисов с добавленными зависимостями</returns>
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddHttpClients(configuration);
-
             services.AddRedisStorage(configuration);
-
             services.AddLogging(configuration);
 
             return services;
         }
 
         /// <summary>
-        /// регистрирует HTTP клиенты для внешних сервисов
+        /// Регистрирует HTTP клиенты для внешних сервисов
         /// </summary>
         private static IServiceCollection AddHttpClients(this IServiceCollection services, IConfiguration configuration)
         {
@@ -68,6 +63,7 @@ namespace Gateway.Infrastructure.Extensions
                 ConnectionMultiplexer.Connect(redisConnectionString));
 
             services.AddScoped<IRedisRepository, RedisRepository>();
+            services.AddScoped<ICacheRepository, RedisRepository>();
 
             return services;
         }
@@ -82,21 +78,39 @@ namespace Gateway.Infrastructure.Extensions
 
     public static class HttpClientPolicyHelpers
     {
-
         public static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (outcome, timespan, retryCount, context) =>
+                    {
+                        // Здесь логирование без использования сервисов из DI
+                        // На данном этапе мы не можем использовать services
+                        // Логирование можно выполнить через context.GetLogger() если передать его отдельно или вообще не логировать здесь
+                    });
         }
 
         public static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+                .CircuitBreakerAsync(
+                    handledEventsAllowedBeforeBreaking: 5,
+                    durationOfBreak: TimeSpan.FromSeconds(30),
+                    onBreak: (outcome, timespan) =>
+                    {
+                        // Здесь мы также избегаем использования services
+                    },
+                    onReset: () =>
+                    {
+                        // И здесь
+                    });
         }
     }
+
     public interface IRedisRepository
     {
         Task<T?> GetAsync<T>(string key);

@@ -8,6 +8,7 @@ using Gateway.Core.Services.History;
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Monitoring;
 using Gateway.Infrastructure.Persistence.tempDB;
+using Gateway.Infrastructure.Extensions;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
@@ -111,21 +112,12 @@ builder.Services.AddSwaggerGen(c =>
     c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}");
 });
 
-builder.Services.AddHttpClient<ILaravelApiClient, LaravelApiClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["ExternalServices:LaravelApi"] ?? "http://localhost:8000");
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-});
 
-builder.Services.AddHttpClient<IAiServicesClient, AiServicesClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["ExternalServices:PythonAiServices"] ?? "http://localhost:5000");
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-});
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-
 builder.Services.AddSingleton<MetricsReporter>();
+builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
+builder.Services.AddApplicationServices(builder.Configuration);
 
 var app = builder.Build();
 

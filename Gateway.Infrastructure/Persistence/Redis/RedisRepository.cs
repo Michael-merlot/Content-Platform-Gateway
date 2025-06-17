@@ -1,11 +1,12 @@
-﻿using Gateway.Infrastructure.Extensions;
+using Gateway.Infrastructure.Extensions;
+using Gateway.Core.Interfaces.Persistence;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System.Text.Json;
 
 namespace Gateway.Infrastructure.Persistence.Redis
 {
-    public class RedisRepository : IRedisRepository
+    public class RedisRepository : IRedisRepository, ICacheRepository
     {
         private readonly IConnectionMultiplexer _redis;
         private readonly ILogger<RedisRepository> _logger;
@@ -31,9 +32,11 @@ namespace Gateway.Infrastructure.Persistence.Redis
                 var value = await _db.StringGetAsync(key);
                 if (value.IsNullOrEmpty)
                 {
+                    _logger.LogInformation("CACHE MISS for key {Key}", key);
                     return default;
                 }
 
+                _logger.LogInformation("CACHE HIT for key {Key}", key);
                 return JsonSerializer.Deserialize<T>(value!);
             }
             catch (Exception ex)
