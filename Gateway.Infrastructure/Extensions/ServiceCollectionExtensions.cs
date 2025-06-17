@@ -1,22 +1,15 @@
 using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Interfaces.Persistence;
 using Gateway.Infrastructure.Clients;
 using Gateway.Infrastructure.Logging;
-using Gateway.Infrastructure.Persistence.Redis;
+using Gateway.Infrastructure.Persistence.Mock;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Polly;
+using Polly.Extensions.Http;
 using StackExchange.Redis;
 using System;
 using System.Net.Http;
-using Polly;
-using Polly.Extensions.Http;
-<<<<<<< HEAD
-using Gateway.Core.Interfaces.Persistence;
-using Microsoft.Extensions.Logging;
-=======
-using Polly.Timeout;
-using Gateway.Core.Interfaces.Persistence;
-
->>>>>>> 781671d28f1477088a62376ca74b53f5fa26a8ca
 
 namespace Gateway.Infrastructure.Extensions
 {
@@ -31,7 +24,7 @@ namespace Gateway.Infrastructure.Extensions
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddHttpClients(configuration);
-            services.AddRedisStorage(configuration);
+            services.AddStorageServices(configuration);
             services.AddLogging(configuration);
 
             return services;
@@ -61,15 +54,27 @@ namespace Gateway.Infrastructure.Extensions
             return services;
         }
 
-        private static IServiceCollection AddRedisStorage(this IServiceCollection services, IConfiguration configuration)
+        private static IServiceCollection AddStorageServices(this IServiceCollection services, IConfiguration configuration)
         {
-            var redisConnectionString = configuration["Redis:ConnectionString"] ?? "localhost:6379";
+            var useRedisMock = true;
 
-            services.AddSingleton<IConnectionMultiplexer>(sp =>
-                ConnectionMultiplexer.Connect(redisConnectionString));
+            if (useRedisMock)
+            {
+                services.AddScoped<ICacheRepository, Gateway.Infrastructure.Persistence.Mock.MockCacheRepository>();
+            }
+            else
+            {
+                var redisConnectionString = configuration["Redis:ConnectionString"] ?? "localhost:6379";
 
-            services.AddScoped<IRedisRepository, RedisRepository>();
-            services.AddScoped<ICacheRepository, RedisRepository>();
+                var options = ConfigurationOptions.Parse(redisConnectionString);
+                options.AbortOnConnectFail = false;
+
+                services.AddSingleton<IConnectionMultiplexer>(sp =>
+                    ConnectionMultiplexer.Connect(options));
+
+                services.AddScoped<IRedisRepository, Gateway.Infrastructure.Persistence.Redis.RedisRepository>();
+                services.AddScoped<ICacheRepository, Gateway.Infrastructure.Persistence.Redis.RedisRepository>();
+            }
 
             return services;
         }
@@ -88,32 +93,14 @@ namespace Gateway.Infrastructure.Extensions
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .WaitAndRetryAsync(
-                    retryCount: 3,
-                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    onRetry: (outcome, timespan, retryCount, context) =>
-                    {
-                        // Здесь логирование без использования сервисов из DI
-                        // На данном этапе мы не можем использовать services
-                        // Логирование можно выполнить через context.GetLogger() если передать его отдельно или вообще не логировать здесь
-                    });
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
         }
 
         public static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .CircuitBreakerAsync(
-                    handledEventsAllowedBeforeBreaking: 5,
-                    durationOfBreak: TimeSpan.FromSeconds(30),
-                    onBreak: (outcome, timespan) =>
-                    {
-                        // Здесь мы также избегаем использования services
-                    },
-                    onReset: () =>
-                    {
-                        // И здесь
-                    });
+                .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
         }
     }
 
