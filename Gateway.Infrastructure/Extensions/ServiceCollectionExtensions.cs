@@ -9,8 +9,14 @@ using System;
 using System.Net.Http;
 using Polly;
 using Polly.Extensions.Http;
+<<<<<<< HEAD
 using Gateway.Core.Interfaces.Persistence;
 using Microsoft.Extensions.Logging;
+=======
+using Polly.Timeout;
+using Gateway.Core.Interfaces.Persistence;
+
+>>>>>>> 781671d28f1477088a62376ca74b53f5fa26a8ca
 
 namespace Gateway.Infrastructure.Extensions
 {

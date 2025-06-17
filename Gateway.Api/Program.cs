@@ -119,6 +119,10 @@ builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
+builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
+
+builder.Services.AddApplicationServices(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();

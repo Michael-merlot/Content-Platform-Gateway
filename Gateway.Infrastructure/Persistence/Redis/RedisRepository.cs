@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 using Gateway.Infrastructure.Extensions;
 using Gateway.Core.Interfaces.Persistence;
+=======
+using Gateway.Core.Interfaces.Persistence;
+using Gateway.Infrastructure.Extensions;
+>>>>>>> 781671d28f1477088a62376ca74b53f5fa26a8ca
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System.Text.Json;
@@ -35,7 +40,10 @@ namespace Gateway.Infrastructure.Persistence.Redis
                     _logger.LogInformation("CACHE MISS for key {Key}", key);
                     return default;
                 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 781671d28f1477088a62376ca74b53f5fa26a8ca
                 _logger.LogInformation("CACHE HIT for key {Key}", key);
                 return JsonSerializer.Deserialize<T>(value!);
             }
@@ -45,6 +53,7 @@ namespace Gateway.Infrastructure.Persistence.Redis
                 return default;
             }
         }
+
 
         /// <summary>
         /// сохраняет значение по ключу

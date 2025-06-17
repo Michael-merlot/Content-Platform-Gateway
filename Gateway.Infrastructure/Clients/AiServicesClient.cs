@@ -156,18 +156,15 @@ namespace Gateway.Infrastructure.Clients
             {
                 var content = new MultipartFormDataContent();
 
-                // Добавляем аудио данные
                 var audioContent = new ByteArrayContent(audioData);
-                audioContent.Headers.Add("Content-Type", "audio/wav"); // Или другой подходящий формат
+                audioContent.Headers.Add("Content-Type", "audio/wav");
                 content.Add(audioContent, "audio", "query.wav");
 
-                // Добавляем userId если он указан
                 if (!string.IsNullOrEmpty(userId))
                 {
                     content.Add(new StringContent(userId), "userId");
                 }
 
-                // Отправляем запрос
                 return await _httpClient.PostMultipartFormDataSafeAsync<VoiceQueryResult>(
                     "/api/v1/naomi/voice",
                     content,
@@ -227,7 +224,6 @@ namespace Gateway.Infrastructure.Clients
         {
             int statusCode = (int)(ex.StatusCode ?? HttpStatusCode.InternalServerError);
 
-            // Формируем понятное пользовательское сообщение в зависимости от статус-кода
             string userMessage = statusCode switch
             {
                 404 => $"Не удалось найти данные для {context}.",
