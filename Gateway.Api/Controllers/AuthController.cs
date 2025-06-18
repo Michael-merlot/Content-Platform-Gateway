@@ -25,10 +25,10 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Authenticates the user</summary>
-    /// <param name="loginRequest">Login request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Authentication tokens</returns>
+    /// <summary>Authenticates the user.</summary>
+    /// <param name="loginRequest">Login request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Authentication tokens.</returns>
     [HttpPost]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
@@ -68,10 +68,10 @@ public class AuthController : ControllerBase
         }
     }
 
-    /// <summary>Verifies the MFA</summary>
-    /// <param name="verifyMfaRequest">MFA verification request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Authentication tokens</returns>
+    /// <summary>Verifies the MFA.</summary>
+    /// <param name="verifyMfaRequest">MFA verification request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Authentication tokens.</returns>
     [HttpPost]
     [ActionName("verify/mfa")]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
@@ -85,10 +85,10 @@ public class AuthController : ControllerBase
         return result.IsSuccess ? Ok(result.Data!.MapToAuthResponse()) : result.AsProblemDetails(this);
     }
 
-    /// <summary>Refreshes the session</summary>
-    /// <param name="refreshRequest">Refresh request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Authentication tokens</returns>
+    /// <summary>Refreshes the session.</summary>
+    /// <param name="refreshRequest">Refresh request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Authentication tokens.</returns>
     [HttpPost]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
@@ -101,9 +101,9 @@ public class AuthController : ControllerBase
         return result.IsSuccess ? Ok(result.Data!.MapToAuthResponse()) : result.AsProblemDetails(this);
     }
 
-    /// <summary>Revokes the access token</summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <remarks>The access token is fetched from the <c>Authorization</c> header</remarks>
+    /// <summary>Revokes the access token.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <remarks>The access token is fetched from the <c>Authorization</c> header.</remarks>
     /// <returns></returns>
     [HttpPost]
     [Authorize]
