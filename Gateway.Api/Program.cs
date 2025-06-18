@@ -160,7 +160,27 @@ builder.Services.AddHealthChecks()
         builder.Configuration.GetConnectionString("Redis"),
         name: "redis-cache",
         tags: new[] { "ready", "cache" })
-    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" });
+    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
+    .AddUrlGroup(
+        new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"] + "/health"),
+        name: "laravel-api",
+        tags: new[] { "ready", "api" })
+    .AddUrlGroup(
+        new Uri(builder.Configuration["ServiceConfiguration:RecommendationService"] + "/health"),
+        name: "recommendation-service",
+        tags: new[] { "ready", "api" });
+
+app.UseHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+app.UseHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
 var app = builder.Build();
 
