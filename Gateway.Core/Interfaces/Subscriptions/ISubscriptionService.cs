@@ -19,5 +19,10 @@ namespace Gateway.Core.Interfaces.Subscriptions
         /// <param name="userId">ID пользователя</param>
         /// <returns>Коллекция элементов ленты</returns>
         Task<IEnumerable<SubscriptionItem>> GetUserFeedAsync(Guid userId);
+
+        /// <summary>
+        /// Для временной инвалидации.
+        /// </summary>
+        Task InvalidateUserFeedCacheAsync(Guid userId);
     }
 }

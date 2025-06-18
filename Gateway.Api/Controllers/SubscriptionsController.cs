@@ -8,6 +8,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Gateway.Api.Controllers
 {
@@ -59,7 +62,55 @@ namespace Gateway.Api.Controllers
                 }).ToList()
             }).ToList();
 
+            // ---- HTTP CACHING ----
+
+            // 1. Генерируем ETag по сериализованному результату
+            string resultJson = JsonSerializer.Serialize(result);
+            string etag;
+            using (var md5 = MD5.Create())
+            {
+                var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(resultJson));
+                etag = $"\"{Convert.ToBase64String(hash)}\""; 
+            }
+
+            // 2. Определяем Last-Modified
+            DateTime? lastModified = null;
+            if (result.Count > 0)
+            {
+                lastModified = result
+                    .SelectMany(r => r.Videos)
+                    .Select(v => v.PublishedAt)
+                    .DefaultIfEmpty(DateTime.MinValue)
+                    .Max();
+            }
+
+            // 3. Проверяем заголовки If-None-Match и If-Modified-Since
+            if (Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) && ifNoneMatch == etag)
+                return StatusCode(StatusCodes.Status304NotModified);
+
+            if (lastModified.HasValue &&
+                Request.Headers.TryGetValue("If-Modified-Since", out var ifModifiedSinceStr) &&
+                DateTime.TryParse(ifModifiedSinceStr, out var ifModifiedSince) &&
+                lastModified.Value <= ifModifiedSince.ToUniversalTime())
+            {
+                return StatusCode(StatusCodes.Status304NotModified);
+            }
+
+            // 4. Устанавливаем ETag и Last-Modified
+            Response.Headers["ETag"] = etag;
+            if (lastModified.HasValue)
+                Response.Headers["Last-Modified"] = lastModified.Value.ToUniversalTime().ToString("R");
+
             return Ok(result);
+        }
+        /// <summary>
+        /// Для временной инициации инвалидации.
+        /// </summary>
+        [HttpPost("invalidate")]
+        public async Task<IActionResult> InvalidateUserFeed([FromBody] Guid userId)
+        {
+            await _subscriptionService.InvalidateUserFeedCacheAsync(userId);
+            return Ok($"Инвалидация кэша для userId {userId} инициирована.");
         }
     }
 }

@@ -33,16 +33,16 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
 
                 if (string.IsNullOrEmpty(data))
                 {
-                    _logger.LogDebug("Cache miss for key {Key}", key);
+                    _logger.LogDebug("Cache(Redis) miss for key {Key}", key);
                     return null;
                 }
 
-                _logger.LogDebug("Cache hit for key {Key}", key);
+                _logger.LogDebug("Cache(Redis) hit for key {Key}", key);
                 return JsonSerializer.Deserialize<T>(data);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting value from cache for key {Key}", key);
+                _logger.LogError(ex, "Error getting value from cache(Redis) for key {Key}", key);
                 return null;
             }
         }
@@ -52,11 +52,11 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
             try
             {
                 await _distributedCache.RemoveAsync(key);
-                _logger.LogDebug("Removed key {Key} from cache", key);
+                _logger.LogDebug("Removed key {Key} from cache(Redis)", key);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error removing key {Key} from cache", key);
+                _logger.LogError(ex, "Error removing key {Key} from cache(Redis)", key);
             }
         }
         public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class
@@ -73,12 +73,12 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
                 var data = JsonSerializer.Serialize(value);
                 await _distributedCache.SetStringAsync(key, data, options);
 
-                _logger.LogDebug("Set key {Key} in cache with expiration {Expiration}",
+                _logger.LogDebug("Set key {Key} in cache(Redis) with expiration {Expiration}",
                     key, expiration?.ToString() ?? "30 minutes");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error setting value in cache for key {Key}", key);
+                _logger.LogError(ex, "Error setting value in cache(Redis) for key {Key}", key);
             }
         }
     }

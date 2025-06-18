@@ -5,6 +5,7 @@ using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
 using Gateway.Core.Interfaces.History;
 using Gateway.Core.Interfaces.Persistence;
+using Gateway.Core.Interfaces.Cache;
 using Gateway.Core.Middleware;
 using Gateway.Core.Monitoring;
 using Gateway.Core.Resilience;
@@ -16,6 +17,11 @@ using Gateway.Infrastructure.Extensions;
 using Gateway.Infrastructure.Monitoring;
 using Gateway.Infrastructure.Persistence.DistributedCache;
 using Gateway.Infrastructure.Persistence.tempDB;
+using Gateway.Infrastructure.Persistence.Memory;
+using Gateway.Infrastructure.Persistence.Redis;
+using Gateway.Infrastructure.Persistence.MultiLevel;
+using Gateway.Infrastructure.Services.Cache;
+using Microsoft.Extensions.Caching.Memory;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -28,6 +34,8 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using StackExchange.Redis;
 using System.Reflection;
+using Gateway.Core.Interfaces.Subscriptions;
+using Gateway.Core.Services.Subscriptions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +48,7 @@ builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();
 builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
 
 builder.Services
     .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
@@ -122,7 +131,6 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
-builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
 builder.Services.AddStackExchangeRedisCache(options =>
@@ -155,6 +163,29 @@ builder.Services.AddHostedService<ConfigurationSyncService>();
 builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
 builder.Services.AddSingleton<MetricsService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
+builder.Services.AddSingleton<IMemoryCacheRepository, MemoryCacheRepository>();
+
+builder.Services.AddSingleton<IMultiLevelCacheRepository, MultiLevelCacheRepository>(sp =>
+{
+    var memory = sp.GetRequiredService<IMemoryCacheRepository>();
+    var distributed = sp.GetRequiredService<IDistributedCacheService>();
+    return new MultiLevelCacheRepository(memory, distributed);
+});
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")
+        ?? builder.Configuration["Redis:ConnectionString"]
+        ?? "localhost:6379,abortConnect=false"));
+
+builder.Services.AddSingleton<ICacheInvalidator, RedisCacheInvalidator>();
+builder.Services.AddHostedService<RedisCacheInvalidationListener>();
+
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>(sp =>
+    new SubscriptionService(
+        sp.GetRequiredService<IMultiLevelCacheRepository>(),
+        sp.GetRequiredService<ICacheInvalidator>()
+    )
+);
 
 builder.Services.AddHealthChecks()
     .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })

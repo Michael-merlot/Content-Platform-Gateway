@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Gateway.Core.Interfaces.Subscriptions;
 using Gateway.Core.Interfaces.Persistence;
+using Gateway.Core.Interfaces.Cache;
 using Gateway.Core.Models.Subscriptions;
 
 namespace Gateway.Core.Services.Subscriptions
@@ -15,16 +16,19 @@ namespace Gateway.Core.Services.Subscriptions
     /// </summary>
     public class SubscriptionService : ISubscriptionService
     {
-        private readonly ICacheRepository _cache;
+        private readonly IMultiLevelCacheRepository _cache;
+        private readonly ICacheInvalidator _cacheInvalidator;
         private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
 
         /// <summary>
-        /// Конструктор сервиса, внедряет кэш-репозиторий.
+        /// Конструктор сервиса, внедряет кэш-репозиторий и сервис инвалидации кэша.
         /// </summary>
         /// <param name="cache">Кэш-репозиторий</param>
-        public SubscriptionService(ICacheRepository cache)
+        /// <param name="cacheInvalidator">Сервис инвалидации кэша</param>
+        public SubscriptionService(IMultiLevelCacheRepository cache, ICacheInvalidator cacheInvalidator)
         {
             _cache = cache;
+            _cacheInvalidator = cacheInvalidator;
         }
 
         /// <summary>
@@ -119,6 +123,16 @@ namespace Gateway.Core.Services.Subscriptions
             await _cache.SetAsync(cacheKey, feed, CacheTtl);
 
             return feed;
+        }
+
+        /// <summary>
+        /// Временный эндпоинт для изменения ленты пользователя и инвалидации.
+        /// </summary>
+        public async Task InvalidateUserFeedCacheAsync(Guid userId)
+        {
+            var cacheKey = $"user_feed_{userId}";
+            await _cache.RemoveAsync(cacheKey);
+            await _cacheInvalidator.PublishInvalidationAsync(cacheKey);
         }
     }
 }
