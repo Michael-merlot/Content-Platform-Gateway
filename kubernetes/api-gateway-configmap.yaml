@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+data:
+  redis-connection: "redis-master:6379,abortConnect=false"
+  laravel-api-url: "http://laravel-api-service:80"
+  recommendation-service-url: "http://recommendation-service:5000"
