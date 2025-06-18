@@ -195,7 +195,7 @@ if (useRedis)
     builder.Services.AddDataProtection()
         .PersistKeysToStackExchangeRedis(redisConnection, "DataProtection-Keys");
 
-    builder.Services.AddScoped<IDistributedCacheService, RedisDistributedCache>();
+    builder.Services.AddSingleton<IDistributedCacheService, RedisDistributedCache>();
 
     // Настройка health checks
     builder.Services.AddHealthChecks()
