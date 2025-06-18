@@ -1,9 +1,11 @@
+using Gateway.Api.Auth;
 using Gateway.Api.Middleware;
 using Gateway.Api.Options;
 using Gateway.Core.Health;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
 using Gateway.Core.Interfaces.History;
+using Gateway.Core.Models.Auth;
 using Gateway.Core.Interfaces.Persistence;
 using Gateway.Core.Interfaces.Cache;
 using Gateway.Core.Middleware;
@@ -13,6 +15,7 @@ using Gateway.Core.Services;
 using Gateway.Core.Services.Auth;
 using Gateway.Core.Services.History;
 using Gateway.Core.Services.Http;
+using Gateway.Infrastructure.Auth;
 using Gateway.Infrastructure.Extensions;
 using Gateway.Infrastructure.Monitoring;
 using Gateway.Infrastructure.Persistence.DistributedCache;
@@ -24,8 +27,10 @@ using Gateway.Infrastructure.Services.Cache;
 using Microsoft.Extensions.Caching.Memory;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -62,10 +67,22 @@ builder.Services.Configure<HostOptions>(options => {
 });
 
 builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
+
+builder.Services.AddDbContext<AuthDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString(AuthDbContext.ConnectionStringName)));
+
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
+builder.Services.AddScoped<IEndpointRepository, EndpointRepository>();
+
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();
-builder.Services.AddControllers();
+
 builder.Services.AddMemoryCache();
+
+builder.Services.AddScoped<IAuthorizationHandler, DynamicPermissionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, AdminUntilDynamicPermissionHandler>();
+builder.Services.AddScoped<PermissionEnrichmentJwtBearerEvents>();
 
 builder.Services
     .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
@@ -84,10 +101,19 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+
+        options.EventsType = typeof(PermissionEnrichmentJwtBearerEvents);
     })
     .Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
+
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(DynamicPermissionPolicies.RequireDynamicPermissionPolicy)
+    .AddPolicy(DynamicPermissionPolicies.RequireAdminPolicyName, DynamicPermissionPolicies.RequireAdminPolicy)
+    .AddPolicy(DynamicPermissionPolicies.RequireAdminUntilDynamicPolicyName, DynamicPermissionPolicies.RequireAdminUntilDynamicPolicy);
+
+builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 
