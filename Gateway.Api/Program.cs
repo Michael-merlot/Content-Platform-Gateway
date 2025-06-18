@@ -1,6 +1,6 @@
 using Gateway.Api.Auth;
 using Gateway.Api.Middleware;
-using Gateway.Api.Options;
+using Gateway.Core.Configuration;
 using Gateway.Core.Health;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
@@ -66,7 +66,10 @@ builder.Services.Configure<HostOptions>(options => {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 
-builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
+builder.Services.AddOptions<AuthOptions>()
+    .Bind(builder.Configuration.GetSection(AuthOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString(AuthDbContext.ConnectionStringName)));
@@ -74,6 +77,7 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
 builder.Services.AddScoped<IEndpointRepository, EndpointRepository>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();
@@ -91,7 +95,7 @@ builder.Services
         if (builder.Environment.IsDevelopment())
             options.RequireHttpsMetadata = false;
 
-        options.Authority = authOptions.Value.Authority;
+        options.Authority = authOptions.Value.Authority.ToString();
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -172,7 +176,6 @@ builder.Services.AddSwaggerGen(c =>
     c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}");
 });
 
-builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
@@ -515,4 +518,3 @@ public class LocalCacheInvalidator : ICacheInvalidator
         return Task.CompletedTask;
     }
 }
-
