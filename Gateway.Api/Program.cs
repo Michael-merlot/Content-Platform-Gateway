@@ -10,6 +10,14 @@ using Gateway.Infrastructure.Monitoring;
 using Gateway.Infrastructure.Persistence.tempDB;
 using Gateway.Infrastructure.Extensions;
 
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using StackExchange.Redis;
+using Gateway.Core.Interfaces.Persistence;
+using Gateway.Core.Services;
+using Gateway.Infrastructure.Persistence.DistributedCache;
+using Gateway.Core.Health;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -122,6 +130,37 @@ builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 
 builder.Services.AddApplicationServices(builder.Configuration);
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "Gateway_";
+});
+
+builder.Services.AddSession(options =>
+{
+    options.Cookie.Name = "Gateway.Session";
+    options.IdleTimeout = TimeSpan.FromHours(1);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
+builder.Services.AddDataProtection()
+    .PersistKeysToStackExchangeRedis(
+        ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")),
+        "DataProtection-Keys");
+
+builder.Services.AddScoped<IDistributedCacheService, RedisDistributedCache>();
+
+builder.Services.AddHostedService<ConfigurationSyncService>();
+
+builder.Services.AddHealthChecks()
+    .AddRedis(
+        builder.Configuration.GetConnectionString("Redis"),
+        name: "redis-cache",
+        tags: new[] { "ready", "cache" })
+    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" });
 
 var app = builder.Build();
 
