@@ -1,6 +1,6 @@
 namespace Gateway.Core.Models.Auth;
 
-/// <summary>Authentication error</summary>
+/// <summary>Represents an authentication error.</summary>
 public enum AuthError
 {
     None,
