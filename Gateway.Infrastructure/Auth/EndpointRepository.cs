@@ -1,0 +1,22 @@
+using Gateway.Core.Interfaces.Auth;
+using Gateway.Core.Models.Auth;
+
+using Microsoft.EntityFrameworkCore;
+
+namespace Gateway.Infrastructure.Auth;
+
+/// <inheritdoc/>
+public class EndpointRepository : IEndpointRepository
+{
+    private readonly AuthDbContext _authDbContext;
+
+    public EndpointRepository(AuthDbContext authDbContext) =>
+        _authDbContext = authDbContext;
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Permission>> GetRequiredPermissionsAsync(string controller, string action, string method) =>
+        await _authDbContext.Endpoints
+            .Where(x => x.Controller == controller && x.Action == action && x.HttpMethod == method)
+            .SelectMany(x => x.EndpointPermissions.Select(x => x.Permission))
+            .ToListAsync();
+}
