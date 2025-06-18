@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -28,8 +29,10 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using StackExchange.Redis;
 using System.Reflection;
+using System.Net.Sockets;
 
 var builder = WebApplication.CreateBuilder(args);
+var logger = Log.ForContext<Program>();
 
 builder.Host.UseSerilog((context, logConfig) =>
     logConfig
@@ -125,63 +128,143 @@ builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
-builder.Services.AddStackExchangeRedisCache(options =>
+// Проверяем доступность Redis
+bool useRedis = false;
+ConnectionMultiplexer redisConnection = null;
+
+try
 {
-    options.Configuration = builder.Configuration.GetConnectionString("Redis")
-        ?? builder.Configuration["Redis:ConnectionString"]
-        ?? "localhost:6379,abortConnect=false";
-    options.InstanceName = "Gateway_";
-});
+    var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ??
+        builder.Configuration["Redis:ConnectionString"];
 
-builder.Services.AddSession(options =>
+    if (!string.IsNullOrEmpty(redisConnectionString))
+    {
+        // Попытка подключения с коротким таймаутом
+        var options = ConfigurationOptions.Parse(redisConnectionString);
+        options.AbortOnConnectFail = false;
+        options.ConnectTimeout = 2000; // 2 секунды таймаут
+
+        redisConnection = ConnectionMultiplexer.Connect(options);
+        useRedis = redisConnection.IsConnected;
+
+        if (useRedis)
+        {
+            logger.Information("Redis доступен и будет использоваться для масштабирования");
+        }
+        else
+        {
+            logger.Warning("Не удалось подключиться к Redis. Используются локальные альтернативы");
+        }
+    }
+}
+catch (Exception ex)
 {
-    options.Cookie.Name = "Gateway.Session";
-    options.IdleTimeout = TimeSpan.FromHours(1);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-});
+    logger.Warning(ex, "Ошибка подключения к Redis. Используются локальные альтернативы");
+}
 
-builder.Services.AddDataProtection()
-    .PersistKeysToStackExchangeRedis(
-        ConnectionMultiplexer.Connect(
-            builder.Configuration.GetConnectionString("Redis")
-            ?? builder.Configuration["Redis:ConnectionString"]
-            ?? "localhost:6379,abortConnect=false"),
-        "DataProtection-Keys");
+// Конфигурация сервисов в зависимости от доступности Redis
+if (useRedis)
+{
+    // Настройка с использованием Redis
+    var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ??
+        builder.Configuration["Redis:ConnectionString"];
 
-builder.Services.AddSingleton<IDistributedCacheService, RedisDistributedCache>();
-builder.Services.AddHostedService<ConfigurationSyncService>();
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "Gateway_";
+    });
+
+    builder.Services.AddSession(options =>
+    {
+        options.Cookie.Name = "Gateway.Session";
+        options.IdleTimeout = TimeSpan.FromHours(1);
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
+
+    builder.Services.AddDataProtection()
+        .PersistKeysToStackExchangeRedis(redisConnection, "DataProtection-Keys");
+
+    builder.Services.AddScoped<IDistributedCacheService, RedisDistributedCache>();
+
+    // Настройка health checks
+    builder.Services.AddHealthChecks()
+        .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
+        .AddRedis(redisConnectionString, name: "redis-cache", tags: new[] { "ready", "cache" });
+}
+else
+{
+    // Настройка с использованием локального кэша
+    builder.Services.AddDistributedMemoryCache();
+    builder.Services.AddSession(options =>
+    {
+        options.Cookie.Name = "Gateway.Session";
+        options.IdleTimeout = TimeSpan.FromHours(1);
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
+
+    builder.Services.AddDataProtection();
+
+    // Используем кастомный IMemoryCache для InMemoryDistributedCache
+    builder.Services.AddSingleton<IMemoryCache>(sp => new MemoryCache(new MemoryCacheOptions()));
+    builder.Services.AddSingleton<IDistributedCacheService, InMemoryDistributedCache>();
+
+    // Health checks без Redis
+    builder.Services.AddHealthChecks()
+        .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" });
+
+    logger.Information("API Gateway использует локальный кэш. Горизонтальное масштабирование ограничено.");
+}
+
+// Общие сервисы, не зависящие от Redis
 builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
+
+// Настраиваем ConfigurationSyncService с IServiceScopeFactory вместо прямой зависимости от IDistributedCacheService
+builder.Services.AddSingleton<ConfigurationSyncService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ConfigurationSyncService>());
+
 builder.Services.AddSingleton<MetricsService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
 
-builder.Services.AddHealthChecks()
-    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
-    .AddRedis(
-        builder.Configuration.GetConnectionString("Redis"),
-        name: "redis-cache",
-        tags: new[] { "ready", "cache" });
-
+// Проверяем доступность внешних сервисов для healthchecks
 if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
 {
-    builder.Services.AddHealthChecks()
-        .AddUrlGroup(
-            new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"] + "/health"),
-            name: "laravel-api",
-            tags: new[] { "ready", "api" });
+    try
+    {
+        builder.Services.AddHealthChecks()
+            .AddUrlGroup(
+                new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"] + "/health"),
+                name: "laravel-api",
+                tags: new[] { "ready", "api" });
+    }
+    catch (Exception ex)
+    {
+        logger.Warning(ex, "Невозможно настроить health check для LaravelApi");
+    }
 }
 
 if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:RecommendationService"]))
 {
-    builder.Services.AddHealthChecks()
-        .AddUrlGroup(
-            new Uri(builder.Configuration["ServiceConfiguration:RecommendationService"] + "/health"),
-            name: "recommendation-service",
-            tags: new[] { "ready", "api" });
+    try
+    {
+        builder.Services.AddHealthChecks()
+            .AddUrlGroup(
+                new Uri(builder.Configuration["ServiceConfiguration:RecommendationService"] + "/health"),
+                name: "recommendation-service",
+                tags: new[] { "ready", "api" });
+    }
+    catch (Exception ex)
+    {
+        logger.Warning(ex, "Невозможно настроить health check для RecommendationService");
+    }
 }
 
-builder.Services.AddHttpClient<ResilientHttpClient>(client =>
+// Настройка отказоустойчивого HTTP клиента
+builder.Services.AddHttpClient<ResilientHttpClient>((sp, client) =>
 {
     if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
     {
@@ -196,12 +279,28 @@ var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
-app.UseMiddleware<MetricsMiddleware>();
+
+if (app.Configuration.GetValue<bool>("EnableMetricsMiddleware", true))
+{
+    app.UseMiddleware<MetricsMiddleware>();
+}
 
 app.UseSerilogRequestLogging();
 
-app.MapGatewayHealthChecks();
+// Конфигурация health checks
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+// Конфигурация среды разработки
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -219,6 +318,7 @@ else
 app.UseHttpsRedirection();
 app.UseSession();
 
+// CORS конфигурация
 app.UseCors(policy =>
 {
     policy.AllowAnyOrigin()
@@ -262,5 +362,69 @@ public class TimeoutHandler : DelegatingHandler
         {
             throw new TimeoutException($"Request timed out after {_timeout.TotalSeconds} seconds");
         }
+    }
+}
+
+/// <summary>
+/// Локальная реализация IDistributedCacheService в памяти
+/// Класс используется, когда Redis недоступен
+/// </summary>
+public class InMemoryDistributedCache : IDistributedCacheService
+{
+    private readonly IMemoryCache _memoryCache;
+    private readonly ILogger<InMemoryDistributedCache> _logger;
+    private readonly Dictionary<string, bool> _keysTracker = new();
+
+    public InMemoryDistributedCache(IMemoryCache memoryCache, ILogger<InMemoryDistributedCache> logger)
+    {
+        _memoryCache = memoryCache;
+        _logger = logger;
+        _logger.LogInformation("Используется локальный кэш для хранения данных. Масштабирование ограничено.");
+    }
+
+    public Task<bool> ExistsAsync(string key)
+    {
+        return Task.FromResult(_keysTracker.ContainsKey(key));
+    }
+
+    public Task<T> GetAsync<T>(string key) where T : class
+    {
+        if (_memoryCache.TryGetValue(key, out string data) && !string.IsNullOrEmpty(data))
+        {
+            try
+            {
+                var result = System.Text.Json.JsonSerializer.Deserialize<T>(data);
+                return Task.FromResult(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка десериализации данных из кэша для ключа {Key}", key);
+            }
+        }
+
+        return Task.FromResult<T>(null);
+    }
+
+    public Task RemoveAsync(string key)
+    {
+        _memoryCache.Remove(key);
+        _keysTracker.Remove(key);
+        return Task.CompletedTask;
+    }
+
+    public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class
+    {
+        var options = new MemoryCacheEntryOptions();
+
+        if (expiration.HasValue)
+            options.SetAbsoluteExpiration(expiration.Value);
+        else
+            options.SetAbsoluteExpiration(TimeSpan.FromMinutes(30));
+
+        var data = System.Text.Json.JsonSerializer.Serialize(value);
+        _memoryCache.Set(key, data, options);
+        _keysTracker[key] = true;
+
+        return Task.CompletedTask;
     }
 }
