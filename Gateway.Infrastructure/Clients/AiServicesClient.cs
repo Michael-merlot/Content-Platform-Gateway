@@ -53,7 +53,7 @@ namespace Gateway.Infrastructure.Clients
 
         /// <inheritdoc/>
         public async Task<IEnumerable<ContentRecommendation>> GetPersonalizedRecommendationsAsync(
-            string userId,
+            int userId,
             int count = 10,
             CancellationToken cancellationToken = default)
         {

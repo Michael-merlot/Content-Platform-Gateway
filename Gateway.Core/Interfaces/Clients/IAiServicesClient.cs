@@ -20,7 +20,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Список рекомендуемого контента</returns>
         Task<IEnumerable<ContentRecommendation>> GetPersonalizedRecommendationsAsync(
-            string userId,
+            int userId,
             int count = 10,
             CancellationToken cancellationToken = default);
 

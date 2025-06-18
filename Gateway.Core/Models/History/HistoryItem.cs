@@ -4,7 +4,7 @@ public class HistoryItem
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
 
-    public Guid UserId { get; set; }
+    public int UserId { get; set; }
     public Guid ContentId { get; set; }
     public ContentType ContentType { get; set; }
 

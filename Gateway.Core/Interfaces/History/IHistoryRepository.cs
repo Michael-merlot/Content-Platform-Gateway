@@ -11,7 +11,7 @@ namespace Gateway.Core.Interfaces.History
         Task<HistoryItem?> GetByIdAsync(Guid id);
         Task<IEnumerable<HistoryItem>> GetAllAsync();
         Task<IEnumerable<HistoryItem>> GetByUserIdAsync(
-            Guid userId,
+            int userId,
             ContentType? contentType = null,
             int skip = 0,
             int take = 50);

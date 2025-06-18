@@ -6,6 +6,6 @@ namespace Gateway.Api.Models.Auth;
 /// <param name="UserId">The ID of a user who needs to be verified</param>
 /// <param name="Code">MFA code</param>
 public sealed record VerifyMfaRequest(
-    string UserId,
+    int UserId,
     [MaxLength(10)] string Code
 );

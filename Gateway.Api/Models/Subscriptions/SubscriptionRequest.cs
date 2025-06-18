@@ -10,6 +10,6 @@ namespace Gateway.Api.Models.Subscriptions
         /// <summary>
         /// Идентификатор пользователя для персонализации ленты.
         /// </summary>
-        public Guid UserId { get; set; }
+        public int UserId { get; set; }
     }
 }

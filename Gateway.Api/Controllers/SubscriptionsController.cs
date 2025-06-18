@@ -41,7 +41,7 @@ namespace Gateway.Api.Controllers
         [HttpPost("feed")]
         public async Task<ActionResult<List<SubscriptionDto>>> GetFeed([FromBody] SubscriptionRequest request)
         {
-            if (request == null || request.UserId == Guid.Empty)
+            if (request == null)
                 return BadRequest("UserId is required.");
 
             // Получаем ленту пользователя через сервис подписок.
@@ -107,7 +107,7 @@ namespace Gateway.Api.Controllers
         /// Для временной инициации инвалидации.
         /// </summary>
         [HttpPost("invalidate")]
-        public async Task<IActionResult> InvalidateUserFeed([FromBody] Guid userId)
+        public async Task<IActionResult> InvalidateUserFeed([FromBody] int userId)
         {
             await _subscriptionService.InvalidateUserFeedCacheAsync(userId);
             return Ok($"Инвалидация кэша для userId {userId} инициирована.");

@@ -37,7 +37,7 @@ namespace Gateway.Core.Services.Subscriptions
         /// </summary>
         /// <param name="userId">ID пользователя</param>
         /// <returns>Коллекция каналов с видео, отсортированных по релевантности</returns>
-        public async Task<IEnumerable<SubscriptionItem>> GetUserFeedAsync(Guid userId)
+        public async Task<IEnumerable<SubscriptionItem>> GetUserFeedAsync(int userId)
         {
             var cacheKey = $"user_feed_{userId}";
 
@@ -128,7 +128,7 @@ namespace Gateway.Core.Services.Subscriptions
         /// <summary>
         /// Временный эндпоинт для изменения ленты пользователя и инвалидации.
         /// </summary>
-        public async Task InvalidateUserFeedCacheAsync(Guid userId)
+        public async Task InvalidateUserFeedCacheAsync(int userId)
         {
             var cacheKey = $"user_feed_{userId}";
             await _cache.RemoveAsync(cacheKey);

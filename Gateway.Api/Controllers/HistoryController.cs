@@ -58,7 +58,7 @@ namespace Gateway.Api.Controllers
         [ProducesResponseType(typeof(IEnumerable<AddHistoryResponse>), 200)]
         [ProducesResponseType(404)]
         public async Task<ActionResult<IEnumerable<AddHistoryResponse>>> GetHistoryByUserId(
-            Guid userId,
+            int userId,
             [FromQuery] ContentType? contentType = null,
             [FromQuery] int skip = 0,
             [FromQuery] int take = 50)  
