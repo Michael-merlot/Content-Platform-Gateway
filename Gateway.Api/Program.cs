@@ -1,27 +1,32 @@
 using Gateway.Api.Middleware;
 using Gateway.Api.Options;
+using Gateway.Core.Health;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
-using Gateway.Core.Services.Auth;
 using Gateway.Core.Interfaces.History;
+using Gateway.Core.Interfaces.Persistence;
+using Gateway.Core.Middleware;
+using Gateway.Core.Monitoring;
+using Gateway.Core.Resilience;
+using Gateway.Core.Services;
+using Gateway.Core.Services.Auth;
 using Gateway.Core.Services.History;
-using Gateway.Infrastructure.Clients;
-using Gateway.Infrastructure.Monitoring;
-using Gateway.Infrastructure.Persistence.tempDB;
+using Gateway.Core.Services.Http;
 using Gateway.Infrastructure.Extensions;
-
-
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
-using Microsoft.AspNetCore.DataProtection;
-using StackExchange.Redis;
+using Gateway.Infrastructure.Monitoring;
+using Gateway.Infrastructure.Persistence.DistributedCache;
+using Gateway.Infrastructure.Persistence.tempDB;
+using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-
 using Serilog;
-
+using StackExchange.Redis;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,10 +37,8 @@ builder.Host.UseSerilog((context, logConfig) =>
         .WriteTo.Console());
 
 builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
-
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();
-
 builder.Services.AddControllers();
 
 builder.Services
@@ -109,7 +112,7 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            []
+            Array.Empty<string>()
         }
     });
 
@@ -117,51 +120,87 @@ builder.Services.AddSwaggerGen(c =>
     c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}");
 });
 
-
-
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
-builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
-builder.Services.AddApplicationServices(builder.Configuration);
-
-try
+builder.Services.AddStackExchangeRedisCache(options =>
 {
-    var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
-    if (!string.IsNullOrEmpty(redisConnectionString))
-    {
-        builder.Services.AddStackExchangeRedisCache(options =>
-        {
-            options.Configuration = redisConnectionString;
-            options.InstanceName = "Gateway_";
-        });
+    options.Configuration = builder.Configuration.GetConnectionString("Redis")
+        ?? builder.Configuration["Redis:ConnectionString"]
+        ?? "localhost:6379,abortConnect=false";
+    options.InstanceName = "Gateway_";
+});
 
-        builder.Services.AddDataProtection()
-            .PersistKeysToStackExchangeRedis(
-                ConnectionMultiplexer.Connect(redisConnectionString),
-                "DataProtection-Keys");
-    }
-    else
-    {
-        builder.Services.AddDistributedMemoryCache();
-    }
-}
-catch (Exception ex)
+builder.Services.AddSession(options =>
 {
-    Console.WriteLine($"Redis configuration failed: {ex.Message}");
+    options.Cookie.Name = "Gateway.Session";
+    options.IdleTimeout = TimeSpan.FromHours(1);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
 
-    builder.Services.AddDistributedMemoryCache();
-    builder.Services.AddDataProtection();
+builder.Services.AddDataProtection()
+    .PersistKeysToStackExchangeRedis(
+        ConnectionMultiplexer.Connect(
+            builder.Configuration.GetConnectionString("Redis")
+            ?? builder.Configuration["Redis:ConnectionString"]
+            ?? "localhost:6379,abortConnect=false"),
+        "DataProtection-Keys");
+
+builder.Services.AddSingleton<IDistributedCacheService, RedisDistributedCache>();
+builder.Services.AddHostedService<ConfigurationSyncService>();
+builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
+builder.Services.AddSingleton<MetricsService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
+
+builder.Services.AddHealthChecks()
+    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
+    .AddRedis(
+        builder.Configuration.GetConnectionString("Redis"),
+        name: "redis-cache",
+        tags: new[] { "ready", "cache" });
+
+if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
+{
+    builder.Services.AddHealthChecks()
+        .AddUrlGroup(
+            new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"] + "/health"),
+            name: "laravel-api",
+            tags: new[] { "ready", "api" });
 }
+
+if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:RecommendationService"]))
+{
+    builder.Services.AddHealthChecks()
+        .AddUrlGroup(
+            new Uri(builder.Configuration["ServiceConfiguration:RecommendationService"] + "/health"),
+            name: "recommendation-service",
+            tags: new[] { "ready", "api" });
+}
+
+builder.Services.AddHttpClient<ResilientHttpClient>(client =>
+{
+    if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
+    {
+        client.BaseAddress = new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"]);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    }
+})
+.AddHttpMessageHandler(() => new TimeoutHandler(TimeSpan.FromSeconds(10)));
 
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<MetricsMiddleware>();
 
 app.UseSerilogRequestLogging();
+
+app.MapGatewayHealthChecks();
 
 if (app.Environment.IsDevelopment())
 {
@@ -178,6 +217,7 @@ else
 }
 
 app.UseHttpsRedirection();
+app.UseSession();
 
 app.UseCors(policy =>
 {
@@ -194,3 +234,33 @@ app.MapControllers();
 app.Run();
 
 public partial class Program { }
+
+/// <summary>
+/// Обработчик таймаутов для HTTP запросов
+/// </summary>
+public class TimeoutHandler : DelegatingHandler
+{
+    private readonly TimeSpan _timeout;
+
+    public TimeoutHandler(TimeSpan timeout)
+    {
+        _timeout = timeout;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        using var cts = new CancellationTokenSource();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
+
+        cts.CancelAfter(_timeout);
+
+        try
+        {
+            return await base.SendAsync(request, linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Request timed out after {_timeout.TotalSeconds} seconds");
+        }
+    }
+}
