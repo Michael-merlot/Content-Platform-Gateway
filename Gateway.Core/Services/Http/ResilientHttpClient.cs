@@ -2,6 +2,7 @@ using Gateway.Core.Resilience;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,23 +21,23 @@ namespace Gateway.Core.Services.Http
             ILogger<ResilientHttpClient> logger,
             string serviceName)
         {
-            _httpClient = httpClient;
-            _policyProvider = policyProvider;
-            _logger = logger;
-            _serviceName = serviceName;
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _policyProvider = policyProvider ?? throw new ArgumentNullException(nameof(policyProvider));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _serviceName = serviceName ?? throw new ArgumentNullException(nameof(serviceName));
         }
 
         public async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken = default)
+    HttpRequestMessage request,
+    CancellationToken cancellationToken = default)
         {
-            var policy = _policyProvider.GetOrCreatePolicy(_serviceName);
+            var pipeline = _policyProvider.GetOrCreatePolicy(_serviceName);
 
             try
             {
-                return await policy.ExecuteAsync(async ct =>
+                return await pipeline.ExecuteAsync(async token =>
                 {
-                    var response = await _httpClient.SendAsync(request, ct);
+                    var response = await _httpClient.SendAsync(request, token);
 
                     _logger.LogInformation(
                         "HTTP {Method} {Uri} responded with {StatusCode}",
@@ -53,7 +54,6 @@ namespace Gateway.Core.Services.Http
                 throw;
             }
         }
-
         public async Task<T> GetJsonAsync<T>(
             string url,
             CancellationToken cancellationToken = default)
@@ -65,7 +65,6 @@ namespace Gateway.Core.Services.Http
             return await response.Content.ReadFromJsonAsync<T>(
                 cancellationToken: cancellationToken);
         }
-
         public async Task<T> PostJsonAsync<TRequest, T>(
             string url,
             TRequest value,

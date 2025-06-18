@@ -1,5 +1,6 @@
 using Gateway.Core.Interfaces.ServiceDiscovery;
 using k8s;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,12 +16,20 @@ namespace Gateway.Core.Services.ServiceDiscovery
 
         public KubernetesServiceDiscovery(ILogger<KubernetesServiceDiscovery> logger)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            var config = KubernetesClientConfiguration.InClusterConfig();
-            _client = new Kubernetes(config);
+            try
+            {
+                var config = KubernetesClientConfiguration.InClusterConfig();
+                _client = new Kubernetes(config);
 
-            _namespace = Environment.GetEnvironmentVariable("POD_NAMESPACE") ?? "default";
+                _namespace = Environment.GetEnvironmentVariable("POD_NAMESPACE") ?? "default";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to initialize Kubernetes client");
+                throw;
+            }
         }
 
         public async Task<IEnumerable<ServiceEndpoint>> GetServiceEndpointsAsync(string serviceName)
@@ -47,6 +56,8 @@ namespace Gateway.Core.Services.ServiceDiscovery
                     }
                 }
 
+                _logger.LogInformation("Found {Count} endpoints for service {ServiceName}", result.Count, serviceName);
+
                 return result;
             }
             catch (Exception ex)
@@ -55,14 +66,5 @@ namespace Gateway.Core.Services.ServiceDiscovery
                 return Enumerable.Empty<ServiceEndpoint>();
             }
         }
-    }
-
-    public class ServiceEndpoint
-    {
-        public string Host { get; set; }
-        public int Port { get; set; }
-        public string ServiceName { get; set; }
-
-        public string Url => $"http://{Host}:{Port}";
     }
 }

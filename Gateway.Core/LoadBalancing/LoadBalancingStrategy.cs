@@ -7,4 +7,3 @@ namespace Gateway.Core.LoadBalancing
         IpHash
     }
 }
-

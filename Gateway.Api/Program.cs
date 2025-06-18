@@ -1,33 +1,32 @@
 using Gateway.Api.Middleware;
 using Gateway.Api.Options;
+using Gateway.Core.Health;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
-using Gateway.Core.Services.Auth;
 using Gateway.Core.Interfaces.History;
+using Gateway.Core.Interfaces.Persistence;
+using Gateway.Core.Middleware;
+using Gateway.Core.Monitoring;
+using Gateway.Core.Resilience;
+using Gateway.Core.Services;
+using Gateway.Core.Services.Auth;
 using Gateway.Core.Services.History;
-using Gateway.Infrastructure.Clients;
-using Gateway.Infrastructure.Monitoring;
-using Gateway.Infrastructure.Persistence.tempDB;
+using Gateway.Core.Services.Http;
 using Gateway.Infrastructure.Extensions;
-
+using Gateway.Infrastructure.Monitoring;
+using Gateway.Infrastructure.Persistence.DistributedCache;
+using Gateway.Infrastructure.Persistence.tempDB;
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using StackExchange.Redis;
-using Gateway.Core.Interfaces.Persistence;
-using Gateway.Core.Services;
-using Gateway.Infrastructure.Persistence.DistributedCache;
-using Gateway.Core.Health;
-using Gateway.Core.Resilience;
-
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using HealthChecks.UI.Client;
-
 using Serilog;
-
+using StackExchange.Redis;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,10 +37,8 @@ builder.Host.UseSerilog((context, logConfig) =>
         .WriteTo.Console());
 
 builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
-
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();
-
 builder.Services.AddControllers();
 
 builder.Services
@@ -128,13 +125,13 @@ builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
-
 builder.Services.AddStackExchangeRedisCache(options =>
 {
-    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.Configuration = builder.Configuration.GetConnectionString("Redis")
+        ?? builder.Configuration["Redis:ConnectionString"]
+        ?? "localhost:6379,abortConnect=false";
     options.InstanceName = "Gateway_";
 });
-
 
 builder.Services.AddSession(options =>
 {
@@ -147,14 +144,20 @@ builder.Services.AddSession(options =>
 
 builder.Services.AddDataProtection()
     .PersistKeysToStackExchangeRedis(
-        ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")),
+        ConnectionMultiplexer.Connect(
+            builder.Configuration.GetConnectionString("Redis")
+            ?? builder.Configuration["Redis:ConnectionString"]
+            ?? "localhost:6379,abortConnect=false"),
         "DataProtection-Keys");
 
-builder.Services.AddScoped<IDistributedCacheService, RedisDistributedCache>();
+builder.Services.AddSingleton<IDistributedCacheService, RedisDistributedCache>();
 builder.Services.AddHostedService<ConfigurationSyncService>();
 builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
+builder.Services.AddSingleton<MetricsService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
 
 builder.Services.AddHealthChecks()
+    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
     .AddRedis(
         builder.Configuration.GetConnectionString("Redis"),
         name: "redis-cache",
@@ -193,20 +196,11 @@ var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<MetricsMiddleware>();
 
 app.UseSerilogRequestLogging();
 
-app.UseHealthChecks("/health/live", new HealthCheckOptions
-{
-    Predicate = _ => true,
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
-
-app.UseHealthChecks("/health/ready", new HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
+app.MapGatewayHealthChecks();
 
 if (app.Environment.IsDevelopment())
 {
@@ -222,10 +216,8 @@ else
     app.UseExceptionHandler("/error");
 }
 
-// Добавляем middleware для сессий
-app.UseSession();
-
 app.UseHttpsRedirection();
+app.UseSession();
 
 app.UseCors(policy =>
 {

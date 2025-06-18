@@ -1,11 +1,12 @@
 using Gateway.Core.Interfaces.ServiceDiscovery;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace Gateway.Core.LoadBalancing
 {
@@ -24,9 +25,9 @@ namespace Gateway.Core.LoadBalancing
             LoadBalancingStrategy strategy,
             ILogger<LoadBalancer> logger)
         {
-            _serviceDiscoveryProvider = serviceDiscoveryProvider;
+            _serviceDiscoveryProvider = serviceDiscoveryProvider ?? throw new ArgumentNullException(nameof(serviceDiscoveryProvider));
             _strategy = strategy;
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<ServiceEndpoint> GetEndpointAsync(string serviceName, string clientIp = null)

@@ -1,6 +1,5 @@
 using Gateway.Core.Monitoring;
 using Microsoft.AspNetCore.Http;
-using Prometheus;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;

@@ -1,6 +1,10 @@
 using Gateway.Core.Interfaces.Persistence;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,9 +23,9 @@ namespace Gateway.Core.Services
             IConfiguration configuration,
             ILogger<ConfigurationSyncService> logger)
         {
-            _cacheService = cacheService;
-            _configuration = configuration;
-            _logger = logger;
+            _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,7 +42,6 @@ namespace Gateway.Core.Services
                         await _cacheService.SetAsync(CONFIGURATION_CACHE_KEY, currentConfig, TimeSpan.FromDays(1));
                         _logger.LogInformation("Configuration synchronized with Redis cache");
                     }
-
                     await ApplyConfigurationChangesFromCache(stoppingToken);
                 }
                 catch (Exception ex)
@@ -85,10 +88,10 @@ namespace Gateway.Core.Services
             return false;
         }
 
-        private async Task ApplyConfigurationChangesFromCache(CancellationToken stoppingToken)
+        private Task ApplyConfigurationChangesFromCache(CancellationToken stoppingToken)
         {
-            // здесь потом реализую механизм для динамического обновления конфигурации
-            // без перезапуска сервиса (если это необходимо и пригодится в будущем - подумаю)
+
+            return Task.CompletedTask;
         }
     }
 }

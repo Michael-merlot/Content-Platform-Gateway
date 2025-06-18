@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Prometheus;
 using System;
@@ -7,23 +8,31 @@ using System.Threading.Tasks;
 
 namespace Gateway.Core.Monitoring
 {
+
     public class MetricsService : IHostedService, IDisposable
     {
         private readonly ILogger<MetricsService> _logger;
-        private MetricServer _metricServer;
+        private KestrelMetricServer _metricServer;
 
         public static readonly Counter TotalRequests = Metrics
-            .CreateCounter("api_gateway_requests_total", "Total number of HTTP requests received");
+            .CreateCounter("api_gateway_requests_total", "Total number of HTTP requests received", new CounterConfiguration
+            {
+                LabelNames = new[] { "method", "path" }
+            });
 
         public static readonly Counter FailedRequests = Metrics
-            .CreateCounter("api_gateway_requests_failed_total", "Total number of failed HTTP requests");
+            .CreateCounter("api_gateway_requests_failed_total", "Total number of failed HTTP requests", new CounterConfiguration
+            {
+                LabelNames = new[] { "method", "path" }
+            });
 
         public static readonly Histogram RequestDuration = Metrics
             .CreateHistogram("api_gateway_request_duration_seconds",
                 "Duration of HTTP requests in seconds",
                 new HistogramConfiguration
                 {
-                    Buckets = Histogram.ExponentialBuckets(0.01, 2, 10)
+                    Buckets = Histogram.ExponentialBuckets(0.01, 2, 10),
+                    LabelNames = new[] { "method", "path", "status_code" }
                 });
 
         public static readonly Gauge ActiveConnections = Metrics
@@ -40,12 +49,11 @@ namespace Gateway.Core.Monitoring
         {
             _logger.LogInformation("Starting metrics server");
 
-            _metricServer = new MetricServer(port: 9091);
+            _metricServer = new KestrelMetricServer(port: 9091);
             _metricServer.Start();
 
             return Task.CompletedTask;
         }
-
         public Task StopAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Stopping metrics server");
@@ -58,8 +66,8 @@ namespace Gateway.Core.Monitoring
         public void Dispose()
         {
             _metricServer?.Dispose();
+            GC.SuppressFinalize(this);
         }
-
         public void RegisterServiceHealth(string serviceName)
         {
             if (!_serviceHealthGauges.ContainsKey(serviceName))
@@ -71,7 +79,6 @@ namespace Gateway.Core.Monitoring
                 _serviceHealthGauges[serviceName] = gauge;
             }
         }
-
         public void SetServiceHealth(string serviceName, bool isHealthy)
         {
             if (_serviceHealthGauges.TryGetValue(serviceName, out var gauge))
