@@ -51,7 +51,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task Login_MfaRequired_ReturnsMfaRequiredResponse()
     {
-        const string uid = "user-123";
+        const int uid = 123;
         LoginRequest loginRequest = new("user@example.com", "pwd");
         LoginResult loginData = new(true, null, new MfaVerificationMetadata(uid));
 
@@ -100,7 +100,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task VerifyMfa_ServiceSuccess_ReturnsAuthResponse()
     {
-        VerifyMfaRequest verifyMfaRequest = new("uid", "123456");
+        VerifyMfaRequest verifyMfaRequest = new(123, "123456");
         AuthTokenSession tokenSession = new("at", "rt", 3600, "Bearer");
 
         _authService.VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, CancellationToken.None)
@@ -115,7 +115,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task VerifyMfa_ServiceError_ReturnsProblem()
     {
-        VerifyMfaRequest verifyMfaRequest = new("uid", "bad");
+        VerifyMfaRequest verifyMfaRequest = new(123, "bad");
 
         _authService.VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, CancellationToken.None)
             .Returns(new AuthResult<AuthTokenSession>(null, AuthError.InvalidGrant, "bad code"));

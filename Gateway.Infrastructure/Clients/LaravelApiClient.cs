@@ -119,7 +119,7 @@ namespace Gateway.Infrastructure.Clients
 
         /// <inheritdoc/>
         public async Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(
-            string userId,
+            int userId,
             string code,
             CancellationToken cancellationToken = default)
         {
@@ -246,7 +246,7 @@ namespace Gateway.Infrastructure.Clients
 
         /// <inheritdoc/>
         public async Task<UserProfileResponse?> GetUserProfileAsync(
-            string userId,
+            int userId,
             CancellationToken cancellationToken = default)
         {
             try
@@ -318,7 +318,7 @@ namespace Gateway.Infrastructure.Clients
             public int ExpiresIn { get; set; }
             public string TokenType { get; set; } = "Bearer";
             public bool MfaRequired { get; set; }
-            public string UserId { get; set; } = string.Empty;
+            public int UserId { get; set; }
         }
 
         private class AuthApiResponse
