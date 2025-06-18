@@ -17,11 +17,14 @@ using Gateway.Core.Interfaces.Persistence;
 using Gateway.Core.Services;
 using Gateway.Infrastructure.Persistence.DistributedCache;
 using Gateway.Core.Health;
+using Gateway.Core.Resilience;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using HealthChecks.UI.Client;
 
 using Serilog;
 
@@ -112,7 +115,7 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            []
+            Array.Empty<string>()
         }
     });
 
@@ -120,22 +123,18 @@ builder.Services.AddSwaggerGen(c =>
     c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}");
 });
 
-
-
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
-builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
-
-builder.Services.AddApplicationServices(builder.Configuration);
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.Configuration = builder.Configuration.GetConnectionString("Redis");
     options.InstanceName = "Gateway_";
 });
+
 
 builder.Services.AddSession(options =>
 {
@@ -152,23 +151,50 @@ builder.Services.AddDataProtection()
         "DataProtection-Keys");
 
 builder.Services.AddScoped<IDistributedCacheService, RedisDistributedCache>();
-
 builder.Services.AddHostedService<ConfigurationSyncService>();
+builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
 
 builder.Services.AddHealthChecks()
     .AddRedis(
         builder.Configuration.GetConnectionString("Redis"),
         name: "redis-cache",
-        tags: new[] { "ready", "cache" })
-    .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
-    .AddUrlGroup(
-        new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"] + "/health"),
-        name: "laravel-api",
-        tags: new[] { "ready", "api" })
-    .AddUrlGroup(
-        new Uri(builder.Configuration["ServiceConfiguration:RecommendationService"] + "/health"),
-        name: "recommendation-service",
-        tags: new[] { "ready", "api" });
+        tags: new[] { "ready", "cache" });
+
+if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
+{
+    builder.Services.AddHealthChecks()
+        .AddUrlGroup(
+            new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"] + "/health"),
+            name: "laravel-api",
+            tags: new[] { "ready", "api" });
+}
+
+if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:RecommendationService"]))
+{
+    builder.Services.AddHealthChecks()
+        .AddUrlGroup(
+            new Uri(builder.Configuration["ServiceConfiguration:RecommendationService"] + "/health"),
+            name: "recommendation-service",
+            tags: new[] { "ready", "api" });
+}
+
+builder.Services.AddHttpClient<ResilientHttpClient>(client =>
+{
+    if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
+    {
+        client.BaseAddress = new Uri(builder.Configuration["ServiceConfiguration:LaravelApi"]);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    }
+})
+.AddHttpMessageHandler(() => new TimeoutHandler(TimeSpan.FromSeconds(10)));
+
+var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+app.UseSerilogRequestLogging();
 
 app.UseHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -181,13 +207,6 @@ app.UseHealthChecks("/health/ready", new HealthCheckOptions
     Predicate = check => check.Tags.Contains("ready"),
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 });
-
-var app = builder.Build();
-
-app.UseMiddleware<ExceptionMiddleware>();
-app.UseMiddleware<RequestLoggingMiddleware>();
-
-app.UseSerilogRequestLogging();
 
 if (app.Environment.IsDevelopment())
 {
@@ -202,6 +221,9 @@ else
 {
     app.UseExceptionHandler("/error");
 }
+
+// Добавляем middleware для сессий
+app.UseSession();
 
 app.UseHttpsRedirection();
 
@@ -220,3 +242,33 @@ app.MapControllers();
 app.Run();
 
 public partial class Program { }
+
+/// <summary>
+/// Обработчик таймаутов для HTTP запросов
+/// </summary>
+public class TimeoutHandler : DelegatingHandler
+{
+    private readonly TimeSpan _timeout;
+
+    public TimeoutHandler(TimeSpan timeout)
+    {
+        _timeout = timeout;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        using var cts = new CancellationTokenSource();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
+
+        cts.CancelAfter(_timeout);
+
+        try
+        {
+            return await base.SendAsync(request, linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Request timed out after {_timeout.TotalSeconds} seconds");
+        }
+    }
+}
