@@ -6,7 +6,7 @@ public abstract class NotificationItem
 {
     public Guid Id { get; set; }
     public string UserId { get; set; }
-    public string Type { get; set; } // Тип уведомления (например, "NewContent", "Comment", "Like", "System")
+    public string Type { get; set; } // Тип уведомления
     public string Message { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public bool IsRead { get; set; } = false;
