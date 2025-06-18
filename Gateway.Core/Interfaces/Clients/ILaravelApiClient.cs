@@ -25,7 +25,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат проверки</returns>
         Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(
-            string userId,
+            int userId,
             string code,
             CancellationToken cancellationToken = default);
 
@@ -50,7 +50,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Информация о пользователе</returns>
         Task<UserProfileResponse?> GetUserProfileAsync(
-            string userId,
+            int userId,
             CancellationToken cancellationToken = default);
     }
 
@@ -59,7 +59,7 @@ namespace Gateway.Core.Interfaces.Clients
     /// </summary>
     public class UserProfileResponse
     {
-        public string Id { get; set; } = string.Empty;
+        public int Id { get; set; }
         public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string AvatarUrl { get; set; } = string.Empty;

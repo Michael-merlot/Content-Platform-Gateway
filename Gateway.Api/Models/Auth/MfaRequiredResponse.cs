@@ -5,7 +5,7 @@ namespace Gateway.Api.Models.Auth;
 /// <param name="Error">An error message</param>
 /// <param name="MfaRequired">Whether or not MFA is required (always <c>true</c>)</param>
 public sealed record MfaRequiredResponse(
-    string UserId,
+    int UserId,
     string Error = "MFA verification is required",
     bool MfaRequired = true
 ) : LoginResponse;

@@ -17,7 +17,7 @@ public class AuthenticationService : IAuthenticationService
         await _apiClient.LoginAsync(email, password, cancellationToken);
 
     /// <inheritdoc/>
-    public async Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(string userId, string code,
+    public async Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(int userId, string code,
         CancellationToken cancellationToken = default) =>
         await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
 
