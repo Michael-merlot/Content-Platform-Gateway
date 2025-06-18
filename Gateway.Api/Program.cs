@@ -10,6 +10,11 @@ using Gateway.Infrastructure.Monitoring;
 using Gateway.Infrastructure.Persistence.tempDB;
 using Gateway.Infrastructure.Extensions;
 
+
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Microsoft.AspNetCore.DataProtection;
+using StackExchange.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -120,8 +125,36 @@ builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionSe
 builder.Services.AddApplicationServices(builder.Configuration);
 
 builder.Services.AddScoped<Gateway.Core.Interfaces.Subscriptions.ISubscriptionService, Gateway.Core.Services.Subscriptions.SubscriptionService>();
-
 builder.Services.AddApplicationServices(builder.Configuration);
+
+try
+{
+    var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+    if (!string.IsNullOrEmpty(redisConnectionString))
+    {
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = redisConnectionString;
+            options.InstanceName = "Gateway_";
+        });
+
+        builder.Services.AddDataProtection()
+            .PersistKeysToStackExchangeRedis(
+                ConnectionMultiplexer.Connect(redisConnectionString),
+                "DataProtection-Keys");
+    }
+    else
+    {
+        builder.Services.AddDistributedMemoryCache();
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Redis configuration failed: {ex.Message}");
+
+    builder.Services.AddDistributedMemoryCache();
+    builder.Services.AddDataProtection();
+}
 
 var app = builder.Build();
 
