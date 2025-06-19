@@ -1,27 +1,110 @@
 version: '3.8'
 
 services:
-  api-gateway:
+  # Первый экземпляр API Gateway
+  api-gateway-1:
     build:
       context: .
-      dockerfile: src/Gateway.API/Dockerfile
+      dockerfile: Gateway.Api/Dockerfile 
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "8081:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__Redis=redis:6379,abortConnect=false
       - ServiceConfiguration__LaravelApi=http://laravel-api:8000
       - ServiceConfiguration__RecommendationService=http://recommendation-service:5000
+      - Metrics__Port=9091
     depends_on:
       - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
 
+  # Второй экземпляр API Gateway
+  api-gateway-2:
+    build:
+      context: .
+      dockerfile: Gateway.Api/Dockerfile 
+    ports:
+      - "8082:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+      - ServiceConfiguration__LaravelApi=http://laravel-api:8000
+      - ServiceConfiguration__RecommendationService=http://recommendation-service:5000
+      - Metrics__Port=9092
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  # Третий экземпляр API Gateway
+  api-gateway-3:
+    build:
+      context: .
+      dockerfile: Gateway.Api/Dockerfile 
+    ports:
+      - "8083:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+      - ServiceConfiguration__LaravelApi=http://laravel-api:8000
+      - ServiceConfiguration__RecommendationService=http://recommendation-service:5000
+      - Metrics__Port=9093
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  # Redis для распределенного кеширования и сессий
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+  # NGINX как балансировщик нагрузки
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-gateway-1
+      - api-gateway-2
+      - api-gateway-3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    restart: unless-stopped
 
 volumes:
   redis-data:

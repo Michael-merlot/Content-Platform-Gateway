@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Prometheus;
@@ -12,6 +13,7 @@ namespace Gateway.Core.Monitoring
     public class MetricsService : IHostedService, IDisposable
     {
         private readonly ILogger<MetricsService> _logger;
+        private readonly IConfiguration _configuration;
         private KestrelMetricServer _metricServer;
 
         public static readonly Counter TotalRequests = Metrics
@@ -40,16 +42,19 @@ namespace Gateway.Core.Monitoring
 
         private readonly Dictionary<string, Gauge> _serviceHealthGauges = new Dictionary<string, Gauge>();
 
-        public MetricsService(ILogger<MetricsService> logger)
+        public MetricsService(ILogger<MetricsService> logger, IConfiguration configuration)
         {
             _logger = logger;
+            _configuration = configuration;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting metrics server");
+            var metricsPort = _configuration.GetValue<int>("Metrics:Port", 9091);
+            _logger.LogInformation($"Metrics server will use port {metricsPort}");
 
-            _metricServer = new KestrelMetricServer(port: 9091);
+            _metricServer = new KestrelMetricServer(port: metricsPort);
             _metricServer.Start();
 
             return Task.CompletedTask;
