@@ -84,17 +84,22 @@ public class AuthenticationController : ControllerBase
     }
 
     /// <summary>Refreshes the session.</summary>
-    /// <param name="refreshRequest">Refresh request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication tokens.</returns>
+    /// <remarks>
+    /// The refresh token is fetched from the cookie with the name from <see cref="RefreshTokenCookieName"/>.
+    /// </remarks>
     [HttpPost]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
-    public async Task<IActionResult> Refresh(RefreshRequest refreshRequest, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken = default)
     {
+        if (!Request.Cookies.TryGetValue(RefreshTokenCookieName, out string? refreshToken))
+            return Unauthorized();
+
         Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
-            .RefreshAsync(refreshRequest.RefreshToken, cancellationToken);
+            .RefreshAsync(refreshToken, cancellationToken);
 
         return result.Match(value =>
             {
