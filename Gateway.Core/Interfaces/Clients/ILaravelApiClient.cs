@@ -17,14 +17,14 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="password">Пароль пользователя</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат аутентификации</returns>
-        Task<AuthResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
+        Task<AuthenticationResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
 
         /// <summary>Проверяет MFA код</summary>
         /// <param name="userId">ID пользователя</param>
         /// <param name="code">Код для проверки</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат проверки</returns>
-        Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(
+        Task<AuthenticationResult<AuthenticatedTokenSession>> VerifyMultiFactorAsync(
             int userId,
             string code,
             CancellationToken cancellationToken = default);
@@ -33,7 +33,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="refreshToken">Токен обновления</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат обновления токена</returns>
-        Task<AuthResult<AuthTokenSession>> RefreshAsync(
+        Task<AuthenticationResult<AuthenticatedTokenSession>> RefreshAsync(
             string refreshToken,
             CancellationToken cancellationToken = default);
 
@@ -41,7 +41,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="accessToken">Токен доступа</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат выполнения операции</returns>
-        Task<AuthResult> LogoutAsync(
+        Task<AuthenticationResult> LogoutAsync(
             string accessToken,
             CancellationToken cancellationToken = default);
 

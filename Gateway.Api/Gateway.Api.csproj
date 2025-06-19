@@ -32,4 +32,8 @@
     <ProjectReference Include="..\Gateway.Infrastructure\Gateway.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Mappers\" />
+  </ItemGroup>
+
 </Project>
