@@ -112,13 +112,14 @@ public sealed class AuthenticationControllerTests
     [Fact]
     public async Task Refresh_ServiceSuccess_ReturnsAuthResponse()
     {
-        RefreshRequest refreshRequest = new("rt");
+        const string refreshToken = "rt";
+        _authenticationController.ControllerContext.HttpContext = BuildHttpContextWithRefreshTokenCookie(refreshToken);
         AuthenticatedTokenSession tokenSession = new("at2", "rt2", 3600, "Bearer");
 
-        _authService.RefreshAsync(refreshRequest.RefreshToken, CancellationToken.None)
+        _authService.RefreshAsync(refreshToken, CancellationToken.None)
             .Returns(tokenSession);
 
-        IActionResult result = await _authenticationController.Refresh(refreshRequest);
+        IActionResult result = await _authenticationController.Refresh();
 
         OkObjectResult ok = result.ShouldBeOfType<OkObjectResult>();
         ok.Value.ShouldBe(tokenSession.ToResponse());
@@ -127,15 +128,27 @@ public sealed class AuthenticationControllerTests
     [Fact]
     public async Task Refresh_ServiceError_ReturnsProblem()
     {
-        RefreshRequest refreshRequest = new("rt");
+        const string refreshToken = "rt";
+        _authenticationController.ControllerContext.HttpContext = BuildHttpContextWithRefreshTokenCookie(refreshToken);
 
-        _authService.RefreshAsync(refreshRequest.RefreshToken, CancellationToken.None)
+        _authService.RefreshAsync(refreshToken, CancellationToken.None)
             .Returns(AuthenticationError.WrongCredentials);
 
-        IActionResult result = await _authenticationController.Refresh(refreshRequest);
+        IActionResult result = await _authenticationController.Refresh();
 
         ObjectResult problem = result.ShouldBeOfType<ObjectResult>();
         problem.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task Refresh_NoRefreshToken_ReturnsUnauthorized()
+    {
+        _authenticationController.ControllerContext.HttpContext = BuildHttpContextWithRefreshTokenCookie(null);
+
+        IActionResult result = await _authenticationController.Refresh();
+
+        result.ShouldBeOfType<UnauthorizedResult>();
+        _ = _authService.DidNotReceive().RefreshAsync(Arg.Any<string>(), CancellationToken.None);
     }
 
     [Fact]
@@ -206,5 +219,14 @@ public sealed class AuthenticationControllerTests
         ServiceProvider provider = services.BuildServiceProvider();
 
         return new DefaultHttpContext { RequestServices = provider };
+    }
+
+    private static DefaultHttpContext BuildHttpContextWithRefreshTokenCookie(string? refreshToken)
+    {
+        DefaultHttpContext httpContext = new();
+
+        httpContext.Request.Headers.Cookie = $"{AuthenticationController.RefreshTokenCookieName}={refreshToken}";
+
+        return httpContext;
     }
 }
