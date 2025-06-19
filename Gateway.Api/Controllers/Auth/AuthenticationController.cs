@@ -20,6 +20,8 @@ public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _authenticationService;
 
+    public const string RefreshTokenCookieName = "Gateway.RefreshToken";
+
     public AuthenticationController(IAuthenticationService authenticationService) =>
         _authenticationService = authenticationService;
 
@@ -27,6 +29,9 @@ public class AuthenticationController : ControllerBase
     /// <param name="loginRequest">Login request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication tokens.</returns>
+    /// <remarks>
+    /// The refresh token is also stored in the cookie with the name from <see cref="RefreshTokenCookieName"/>.
+    /// </remarks>
     [HttpPost]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
@@ -39,18 +44,27 @@ public class AuthenticationController : ControllerBase
         if (!result.IsSuccess)
             return result.Error.AsProblemDetails(this);
 
-        return result.Value! switch
+        switch (result.Value!)
         {
-            MfaVerificationRequired mfaVerificationRequired => Ok(mfaVerificationRequired.Metadata.MapToMfaRequiredResponse()),
-            LoginSucceeded loginSucceeded => Ok(loginSucceeded.TokenSession.MapToAuthResponse()),
-            _ => throw new UnreachableException($"Unexpected login success result: {result.Value?.GetType().FullName}")
-        };
+            case MfaVerificationRequired mfaVerificationRequired:
+                return Ok(mfaVerificationRequired.Metadata.MapToMfaRequiredResponse());
+            case LoginSucceeded loginSucceeded:
+            {
+                AppendRefreshTokenCookieToResponse(loginSucceeded.TokenSession.RefreshToken, loginSucceeded.TokenSession.ExpiresIn);
+                return Ok(loginSucceeded.TokenSession.MapToAuthResponse());
+            }
+            default:
+                throw new UnreachableException($"Unexpected login success result: {result.Value?.GetType().FullName}");
+        }
     }
 
     /// <summary>Verifies the MFA.</summary>
     /// <param name="verifyMfaRequest">MFA verification request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication tokens.</returns>
+    /// <remarks>
+    /// The refresh token is also stored in the cookie with the name from <see cref="RefreshTokenCookieName"/>.
+    /// </remarks>
     [HttpPost]
     [ActionName("verify/mfa")]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
@@ -61,7 +75,11 @@ public class AuthenticationController : ControllerBase
         Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
             .VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, cancellationToken);
 
-        return result.Match(value => Ok(value.MapToAuthResponse()),
+        return result.Match(value =>
+            {
+                AppendRefreshTokenCookieToResponse(value.RefreshToken, value.ExpiresIn);
+                return Ok(value.MapToAuthResponse());
+            },
             error => error.AsProblemDetails(this));
     }
 
@@ -78,7 +96,11 @@ public class AuthenticationController : ControllerBase
         Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
             .RefreshAsync(refreshRequest.RefreshToken, cancellationToken);
 
-        return result.Match(value => Ok(value.MapToAuthResponse()),
+        return result.Match(value =>
+            {
+                AppendRefreshTokenCookieToResponse(value.RefreshToken, value.ExpiresIn);
+                return Ok(value.MapToAuthResponse());
+            },
             error => error.AsProblemDetails(this));
     }
 
@@ -86,6 +108,9 @@ public class AuthenticationController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <remarks>The access token is fetched from the <c>Authorization</c> header.</remarks>
     /// <returns></returns>
+    /// <remarks>
+    /// The refresh token is also stored in the cookie with the name from <see cref="RefreshTokenCookieName"/>.
+    /// </remarks>
     [HttpPost]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -104,4 +129,14 @@ public class AuthenticationController : ControllerBase
         return result.Match(NoContent,
             error => error.AsProblemDetails(this));
     }
+
+    private void AppendRefreshTokenCookieToResponse(string refreshToken, int expiresIn) =>
+        Response.Cookies.Append(RefreshTokenCookieName, refreshToken, new CookieOptions
+        {
+            Path = "/",
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            MaxAge = TimeSpan.FromSeconds(expiresIn * 2)
+        });
 }
