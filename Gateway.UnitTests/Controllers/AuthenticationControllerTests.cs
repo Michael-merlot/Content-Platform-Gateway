@@ -56,7 +56,7 @@ public sealed class AuthenticationControllerTests
         LoginResult loginData = new(true, null, new MfaVerificationMetadata(uid));
 
         _authService.LoginAsync(loginRequest.Email, loginRequest.Password, CancellationToken.None)
-            .Returns(new AuthenticationResult<LoginResult>(loginData, AuthenticationError.None, null));
+            .Returns(new AuthenticationResult<LoginResult>(loginData, AuthenticationError.None));
 
         IActionResult result = await _authenticationController.Login(loginRequest);
 
@@ -72,7 +72,7 @@ public sealed class AuthenticationControllerTests
         LoginResult loginData = new(false, tokenSession, null);
 
         _authService.LoginAsync(loginRequest.Email, loginRequest.Password, CancellationToken.None)
-            .Returns(new AuthenticationResult<LoginResult>(loginData, AuthenticationError.None, null));
+            .Returns(new AuthenticationResult<LoginResult>(loginData, AuthenticationError.None));
 
         IActionResult result = await _authenticationController.Login(loginRequest);
 
@@ -86,7 +86,7 @@ public sealed class AuthenticationControllerTests
         LoginResult inconsistentLoginResult = new(true, null, null);
 
         _authService.LoginAsync(Arg.Any<string>(), Arg.Any<string>(), CancellationToken.None)
-            .Returns(new AuthenticationResult<LoginResult>(inconsistentLoginResult, AuthenticationError.None, null));
+            .Returns(new AuthenticationResult<LoginResult>(inconsistentLoginResult, AuthenticationError.None));
 
         IActionResult result = await _authenticationController.Login(new LoginRequest("user@example.com", "pwd"));
 
@@ -104,7 +104,7 @@ public sealed class AuthenticationControllerTests
         AuthenticatedTokenSession tokenSession = new("at", "rt", 3600, "Bearer");
 
         _authService.VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, CancellationToken.None)
-            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(tokenSession, AuthenticationError.None, null));
+            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(tokenSession, AuthenticationError.None));
 
         IActionResult result = await _authenticationController.VerifyMfa(verifyMfaRequest);
 
@@ -133,7 +133,7 @@ public sealed class AuthenticationControllerTests
         AuthenticatedTokenSession tokenSession = new("at2", "rt2", 3600, "Bearer");
 
         _authService.RefreshAsync(refreshRequest.RefreshToken, CancellationToken.None)
-            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(tokenSession, AuthenticationError.None, null));
+            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(tokenSession, AuthenticationError.None));
 
         IActionResult result = await _authenticationController.Refresh(refreshRequest);
 
@@ -172,7 +172,7 @@ public sealed class AuthenticationControllerTests
         _authenticationController.ControllerContext.HttpContext = BuildHttpContext("at");
 
         _authService.LogoutAsync("at", CancellationToken.None)
-            .Returns(new AuthenticationResult(AuthenticationError.None, null));
+            .Returns(new AuthenticationResult(AuthenticationError.None));
 
         IActionResult result = await _authenticationController.Logout();
 
