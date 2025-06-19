@@ -5,20 +5,20 @@ namespace Gateway.Core.Models.Auth;
 /// <param name="Error">The error.</param>
 /// <param name="ErrorDescription">The error description, if any.</param>
 /// <typeparam name="T">The type of returned data.</typeparam>
-public sealed record AuthResult<T>(
+public sealed record AuthenticationResult<T>(
     T? Data,
-    AuthError Error,
+    AuthenticationError Error,
     string? ErrorDescription
-) : AuthResult(Error, ErrorDescription);
+) : AuthenticationResult(Error, ErrorDescription);
 
 /// <summary>Represents an authentication result.</summary>
 /// <param name="Error">The error.</param>
 /// <param name="ErrorDescription">The error description, if any.</param>
-public record AuthResult(
-    AuthError Error,
+public record AuthenticationResult(
+    AuthenticationError Error,
     string? ErrorDescription
 )
 {
     /// <summary>Whether or not the operation succeeded.</summary>
-    public bool IsSuccess => Error == AuthError.None;
+    public bool IsSuccess => Error == AuthenticationError.None;
 }

@@ -6,6 +6,6 @@ namespace Gateway.Core.Models.Auth;
 /// <param name="MfaVerificationRequiredMetadata">Not <c>null</c> when <paramref name="MfaRequired"/> is <c>true</c>.</param>
 public sealed record LoginResult(
     bool MfaRequired,
-    AuthTokenSession? AuthTokenSession,
+    AuthenticatedTokenSession? AuthTokenSession,
     MfaVerificationMetadata? MfaVerificationRequiredMetadata
 );
