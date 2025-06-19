@@ -1,4 +1,5 @@
-﻿using Gateway.Core.Models.Auth;
+﻿using Gateway.Core.Models;
+using Gateway.Core.Models.Auth;
 
 namespace Gateway.Core.Interfaces.Auth;
 
@@ -9,26 +10,27 @@ public interface IAuthenticationService
     /// <param name="email">User e-mail.</param>
     /// <param name="password">User password.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Authentication result.</returns>
-    Task<AuthenticationResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
+    /// <returns>Login result or an error.</returns>
+    Task<Result<LoginResult, AuthenticationError>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
 
     /// <summary>Verifies MFA code.</summary>
     /// <param name="userId">The unique identifier of the user to verify.</param>
     /// <param name="code">The code to verify.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Authentication result.</returns>
-    Task<AuthenticationResult<AuthenticatedTokenSession>> VerifyMultiFactorAsync(int userId, string code,
+    /// <returns>Authentication result or an error.</returns>
+    Task<Result<AuthenticatedTokenSession, AuthenticationError>> VerifyMultiFactorAsync(int userId, string code,
         CancellationToken cancellationToken = default);
 
     /// <summary>Refreshes the session.</summary>
     /// <param name="refreshToken">Refresh token.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Refresh token result.</returns>
-    Task<AuthenticationResult<AuthenticatedTokenSession>> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default);
+    /// <returns>Refresh token result or an error.</returns>
+    Task<Result<AuthenticatedTokenSession, AuthenticationError>> RefreshAsync(string refreshToken,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Logs the user out.</summary>
     /// <param name="accessToken">Access token.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Whether the log out completed successfully.</returns>
-    Task<AuthenticationResult> LogoutAsync(string accessToken, CancellationToken cancellationToken = default);
+    /// <returns>Whether the log out completed successfully; otherwise, an error.</returns>
+    Task<Result<AuthenticationError>> LogoutAsync(string accessToken, CancellationToken cancellationToken = default);
 }

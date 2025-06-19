@@ -21,15 +21,14 @@ internal static class AuthenticationMapper
         new(mfaVerificationMetadata.UserId);
 
     /// <summary>
-    /// Constructs <see cref="IActionResult"/> with problem details from the <see cref="AuthenticationResult"/>.
+    /// Constructs <see cref="IActionResult"/> with problem details from the <see cref="AuthenticationError"/>.
     /// </summary>
-    /// <param name="result">The <see cref="AuthenticationResult"/> to construct from.</param>
+    /// <param name="error">The <see cref="AuthenticationError"/> to construct from.</param>
     /// <param name="controller">The controller from which the problem details will be constructed.</param>
     /// <returns>Problem details action result.</returns>
-    public static IActionResult ToProblemDetails(this AuthenticationResult result, ControllerBase controller) =>
-        controller.Problem(statusCode: result.Error.ToHttpStatus(),
-            title: result.Error.ToString(),
-            detail: result.ErrorDescription);
+    public static IActionResult ToProblemDetails(this AuthenticationError error, ControllerBase controller) =>
+        controller.Problem(statusCode: error.ToHttpStatus(),
+            title: error.ToString());
 
     /// <summary>Maps <see cref="AuthenticationError"/> to <see cref="int"/> HTTP status code.</summary>
     /// <param name="error">The <see cref="AuthenticationError"/> to map.</param>

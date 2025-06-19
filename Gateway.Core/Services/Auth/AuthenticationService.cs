@@ -1,5 +1,6 @@
 ﻿using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 
 namespace Gateway.Core.Services.Auth;
@@ -13,21 +14,21 @@ public class AuthenticationService : IAuthenticationService
         _apiClient = apiClient;
 
     /// <inheritdoc/>
-    public async Task<AuthenticationResult<LoginResult>> LoginAsync(string email, string password,
+    public async Task<Result<LoginResult, AuthenticationError>> LoginAsync(string email, string password,
         CancellationToken cancellationToken = default) =>
         await _apiClient.LoginAsync(email, password, cancellationToken);
 
     /// <inheritdoc/>
-    public async Task<AuthenticationResult<AuthenticatedTokenSession>> VerifyMultiFactorAsync(int userId, string code,
+    public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> VerifyMultiFactorAsync(int userId, string code,
         CancellationToken cancellationToken = default) =>
         await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
 
     /// <inheritdoc/>
-    public async Task<AuthenticationResult<AuthenticatedTokenSession>> RefreshAsync(string refreshToken,
+    public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> RefreshAsync(string refreshToken,
         CancellationToken cancellationToken = default) =>
         await _apiClient.RefreshAsync(refreshToken, cancellationToken);
 
     /// <inheritdoc/>
-    public async Task<AuthenticationResult> LogoutAsync(string accessToken, CancellationToken cancellationToken = default) =>
+    public async Task<Result<AuthenticationError>> LogoutAsync(string accessToken, CancellationToken cancellationToken = default) =>
         await _apiClient.LogoutAsync(accessToken, cancellationToken);
 }

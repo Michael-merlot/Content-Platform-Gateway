@@ -1,11 +1,13 @@
 using Gateway.Api.Mappers;
 using Gateway.Api.Models.Auth;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using System.Diagnostics;
 using System.Net.Mime;
 
 using IAuthenticationService = Gateway.Core.Interfaces.Auth.IAuthenticationService;
@@ -17,13 +19,9 @@ namespace Gateway.Api.Controllers.Auth;
 public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _authenticationService;
-    private readonly ILogger<AuthenticationController> _logger;
 
-    public AuthenticationController(IAuthenticationService authenticationService, ILogger<AuthenticationController> logger)
-    {
+    public AuthenticationController(IAuthenticationService authenticationService) =>
         _authenticationService = authenticationService;
-        _logger = logger;
-    }
 
     /// <summary>Authenticates the user.</summary>
     /// <param name="loginRequest">Login request.</param>
@@ -35,37 +33,18 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> Login(LoginRequest loginRequest, CancellationToken cancellationToken = default)
     {
-        AuthenticationResult<LoginResult> result = await _authenticationService
+        Result<LoginResult, AuthenticationError> result = await _authenticationService
             .LoginAsync(loginRequest.Email, loginRequest.Password, cancellationToken);
 
         if (!result.IsSuccess)
-            return result.ToProblemDetails(this);
+            return result.Error.ToProblemDetails(this);
 
-        switch (result.Data!.MfaRequired)
+        return result.Value! switch
         {
-            case true when result.Data.MfaVerificationRequiredMetadata is not null:
-            {
-                return Ok(result.Data.MfaVerificationRequiredMetadata.ToResponse());
-            }
-            case false when result.Data.AuthTokenSession is not null:
-            {
-                return Ok(result.Data.AuthTokenSession.ToResponse());
-            }
-            default:
-            {
-                _logger.LogError("Invalid login response was received. " +
-                    "MfaRequired: {MfaRequired}; " +
-                    "AuthenticatedTokenSession: {AuthTokenSessionIsNull}; " +
-                    "MfaVerificationRequiredMetadata: {MfaVerificationRequiredMetadataIsNull}",
-                    result.Data.MfaRequired,
-                    result.Data.AuthTokenSession is null,
-                    result.Data.MfaVerificationRequiredMetadata is null);
-
-                return Problem(statusCode: StatusCodes.Status500InternalServerError,
-                    title: "Unknown error",
-                    detail: "Unknown error while verifying the authentication result");
-            }
-        }
+            MfaVerificationRequired mfaVerificationRequired => Ok(mfaVerificationRequired.Metadata.ToResponse()),
+            LoginSucceeded loginSucceeded => Ok(loginSucceeded.TokenSession.ToResponse()),
+            _ => throw new UnreachableException($"Unexpected login success result: {result.Value?.GetType().FullName}")
+        };
     }
 
     /// <summary>Verifies the MFA.</summary>
@@ -79,10 +58,11 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> VerifyMfa(VerifyMfaRequest verifyMfaRequest, CancellationToken cancellationToken = default)
     {
-        AuthenticationResult<AuthenticatedTokenSession> result = await _authenticationService
+        Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
             .VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, cancellationToken);
 
-        return result.IsSuccess ? Ok(result.Data!.ToResponse()) : result.ToProblemDetails(this);
+        return result.Match(value => Ok(value.ToResponse()),
+            error => error.ToProblemDetails(this));
     }
 
     /// <summary>Refreshes the session.</summary>
@@ -95,10 +75,11 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> Refresh(RefreshRequest refreshRequest, CancellationToken cancellationToken = default)
     {
-        AuthenticationResult<AuthenticatedTokenSession> result = await _authenticationService
+        Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
             .RefreshAsync(refreshRequest.RefreshToken, cancellationToken);
 
-        return result.IsSuccess ? Ok(result.Data!.ToResponse()) : result.ToProblemDetails(this);
+        return result.Match(value => Ok(value.ToResponse()),
+            error => error.ToProblemDetails(this));
     }
 
     /// <summary>Revokes the access token.</summary>
@@ -117,9 +98,10 @@ public class AuthenticationController : ControllerBase
         if (String.IsNullOrEmpty(accessToken))
             return Unauthorized();
 
-        AuthenticationResult result = await _authenticationService
+        Result<AuthenticationError> result = await _authenticationService
             .LogoutAsync(accessToken, cancellationToken);
 
-        return result.IsSuccess ? NoContent() : result.ToProblemDetails(this);
+        return result.Match(NoContent,
+            error => error.ToProblemDetails(this));
     }
 }

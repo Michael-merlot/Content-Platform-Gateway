@@ -1,6 +1,7 @@
 using Gateway.Api.Controllers.Auth;
 using Gateway.Api.Mappers;
 using Gateway.Api.Models.Auth;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 
 using Microsoft.AspNetCore.Authentication;
@@ -8,7 +9,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 using NSubstitute;
 
@@ -23,23 +23,21 @@ namespace Gateway.UnitTests.Controllers;
 public sealed class AuthenticationControllerTests
 {
     private readonly IAuthenticationService _authService = Substitute.For<IAuthenticationService>();
-    private readonly ILogger<AuthenticationController> _logger = Substitute.For<ILogger<AuthenticationController>>();
     private readonly AuthenticationController _authenticationController;
 
     public AuthenticationControllerTests() =>
-        _authenticationController = new AuthenticationController(_authService, _logger)
+        _authenticationController = new AuthenticationController(_authService)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
 
     [Fact]
-    public async Task Login_ServiceError_ReturnsProblem401()
+    public async Task Login_WrongCredentials_ReturnsProblem401()
     {
         LoginRequest loginRequest = new("user@example.com", "pwd");
-        AuthenticationResult<LoginResult> serviceResult = new(null, AuthenticationError.InvalidClient, "invalid client");
 
         _authService.LoginAsync(loginRequest.Email, loginRequest.Password, CancellationToken.None)
-            .Returns(serviceResult);
+            .Returns(AuthenticationError.InvalidClient);
 
         IActionResult result = await _authenticationController.Login(loginRequest);
 
@@ -53,10 +51,10 @@ public sealed class AuthenticationControllerTests
     {
         const int uid = 123;
         LoginRequest loginRequest = new("user@example.com", "pwd");
-        LoginResult loginData = new(true, null, new MfaVerificationMetadata(uid));
+        LoginResult loginData = new MfaVerificationRequired(new MfaVerificationMetadata(uid));
 
         _authService.LoginAsync(loginRequest.Email, loginRequest.Password, CancellationToken.None)
-            .Returns(new AuthenticationResult<LoginResult>(loginData, AuthenticationError.None));
+            .Returns(loginData);
 
         IActionResult result = await _authenticationController.Login(loginRequest);
 
@@ -69,32 +67,15 @@ public sealed class AuthenticationControllerTests
     {
         LoginRequest loginRequest = new("user@example.com", "pwd");
         AuthenticatedTokenSession tokenSession = new("at", "rt", 3600, "Bearer");
-        LoginResult loginData = new(false, tokenSession, null);
+        LoginResult loginData = new LoginSucceeded(tokenSession);
 
         _authService.LoginAsync(loginRequest.Email, loginRequest.Password, CancellationToken.None)
-            .Returns(new AuthenticationResult<LoginResult>(loginData, AuthenticationError.None));
+            .Returns(loginData);
 
         IActionResult result = await _authenticationController.Login(loginRequest);
 
         OkObjectResult ok = result.ShouldBeOfType<OkObjectResult>();
         ok.Value.ShouldBe(tokenSession.ToResponse());
-    }
-
-    [Fact]
-    public async Task Login_InvalidData_ReturnsProblem500_AndLogs()
-    {
-        LoginResult inconsistentLoginResult = new(true, null, null);
-
-        _authService.LoginAsync(Arg.Any<string>(), Arg.Any<string>(), CancellationToken.None)
-            .Returns(new AuthenticationResult<LoginResult>(inconsistentLoginResult, AuthenticationError.None));
-
-        IActionResult result = await _authenticationController.Login(new LoginRequest("user@example.com", "pwd"));
-
-        ObjectResult problem = result.ShouldBeOfType<ObjectResult>();
-        problem.StatusCode.ShouldBe(StatusCodes.Status500InternalServerError);
-
-        _logger.ReceivedWithAnyArgs(1)
-            .Log(LogLevel.Error, default!, null!, null!, null!);
     }
 
     [Fact]
@@ -104,7 +85,7 @@ public sealed class AuthenticationControllerTests
         AuthenticatedTokenSession tokenSession = new("at", "rt", 3600, "Bearer");
 
         _authService.VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, CancellationToken.None)
-            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(tokenSession, AuthenticationError.None));
+            .Returns(tokenSession);
 
         IActionResult result = await _authenticationController.VerifyMfa(verifyMfaRequest);
 
@@ -118,7 +99,7 @@ public sealed class AuthenticationControllerTests
         VerifyMfaRequest verifyMfaRequest = new(123, "bad");
 
         _authService.VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, CancellationToken.None)
-            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(null, AuthenticationError.InvalidGrant, "bad code"));
+            .Returns(AuthenticationError.InvalidGrant);
 
         IActionResult result = await _authenticationController.VerifyMfa(verifyMfaRequest);
 
@@ -133,7 +114,7 @@ public sealed class AuthenticationControllerTests
         AuthenticatedTokenSession tokenSession = new("at2", "rt2", 3600, "Bearer");
 
         _authService.RefreshAsync(refreshRequest.RefreshToken, CancellationToken.None)
-            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(tokenSession, AuthenticationError.None));
+            .Returns(tokenSession);
 
         IActionResult result = await _authenticationController.Refresh(refreshRequest);
 
@@ -147,7 +128,7 @@ public sealed class AuthenticationControllerTests
         RefreshRequest refreshRequest = new("rt");
 
         _authService.RefreshAsync(refreshRequest.RefreshToken, CancellationToken.None)
-            .Returns(new AuthenticationResult<AuthenticatedTokenSession>(null, AuthenticationError.InvalidGrant, "revoked"));
+            .Returns(AuthenticationError.InvalidGrant);
 
         IActionResult result = await _authenticationController.Refresh(refreshRequest);
 
@@ -172,7 +153,7 @@ public sealed class AuthenticationControllerTests
         _authenticationController.ControllerContext.HttpContext = BuildHttpContext("at");
 
         _authService.LogoutAsync("at", CancellationToken.None)
-            .Returns(new AuthenticationResult(AuthenticationError.None));
+            .Returns(Result<AuthenticationError>.Success());
 
         IActionResult result = await _authenticationController.Logout();
 
@@ -185,7 +166,7 @@ public sealed class AuthenticationControllerTests
         _authenticationController.ControllerContext.HttpContext = BuildHttpContext("at");
 
         _authService.LogoutAsync("at", CancellationToken.None)
-            .Returns(new AuthenticationResult(AuthenticationError.InvalidGrant, "expired"));
+            .Returns(AuthenticationError.InvalidGrant);
 
         IActionResult result = await _authenticationController.Logout();
 

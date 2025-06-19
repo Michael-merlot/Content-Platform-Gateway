@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Gateway.Core.Exceptions;
 using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 using Gateway.Infrastructure.Extensions;
 using Microsoft.Extensions.Logging;
@@ -51,7 +52,7 @@ namespace Gateway.Infrastructure.Clients
         }
 
         /// <inheritdoc/>
-        public async Task<AuthenticationResult<LoginResult>> LoginAsync(
+        public async Task<Result<LoginResult, AuthenticationError>> LoginAsync(
             string email,
             string password,
             CancellationToken cancellationToken = default)
@@ -71,26 +72,16 @@ namespace Gateway.Infrastructure.Clients
 
                 if (response.MfaRequired)
                 {
-                    return new AuthenticationResult<LoginResult>(
-                        new LoginResult(
-                            MfaRequired: true,
-                            AuthTokenSession: null,
-                            MfaVerificationRequiredMetadata: new MfaVerificationMetadata(response.UserId)),
-                        AuthenticationError.None);
+                    return new MfaVerificationRequired(
+                        new MfaVerificationMetadata(response.UserId));
                 }
-                else
-                {
-                    return new AuthenticationResult<LoginResult>(
-                        new LoginResult(
-                            MfaRequired: false,
-                            AuthTokenSession: new AuthenticatedTokenSession(
-                                response.AccessToken,
-                                response.RefreshToken,
-                                response.ExpiresIn,
-                                response.TokenType),
-                            MfaVerificationRequiredMetadata: null),
-                        AuthenticationError.None);
-                }
+
+                return new LoginSucceeded(
+                    new AuthenticatedTokenSession(
+                        response.AccessToken,
+                        response.RefreshToken,
+                        response.ExpiresIn,
+                        response.TokenType));
             }
             catch (HttpRequestException ex)
             {
@@ -100,23 +91,17 @@ namespace Gateway.Infrastructure.Clients
             catch (JsonException ex)
             {
                 _logger.LogError(ex, "Error deserializing login response");
-                return new AuthenticationResult<LoginResult>(
-                    null,
-                    AuthenticationError.ServerError,
-                    "Ошибка обработки ответа сервера");
+                return AuthenticationError.ServerError;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during login");
-                return new AuthenticationResult<LoginResult>(
-                    null,
-                    AuthenticationError.ServerError,
-                    "Произошла непредвиденная ошибка");
+                return AuthenticationError.ServerError;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<AuthenticationResult<AuthenticatedTokenSession>> VerifyMultiFactorAsync(
+        public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> VerifyMultiFactorAsync(
             int userId,
             string code,
             CancellationToken cancellationToken = default)
@@ -134,13 +119,11 @@ namespace Gateway.Infrastructure.Clients
                     request,
                     cancellationToken);
 
-                return new AuthenticationResult<AuthenticatedTokenSession>(
-                    new AuthenticatedTokenSession(
+                return new AuthenticatedTokenSession(
                         response.AccessToken,
                         response.RefreshToken,
                         response.ExpiresIn,
-                        response.TokenType),
-                    AuthenticationError.None);
+                        response.TokenType);
             }
             catch (HttpRequestException ex)
             {
@@ -150,23 +133,17 @@ namespace Gateway.Infrastructure.Clients
             catch (JsonException ex)
             {
                 _logger.LogError(ex, "Error deserializing MFA verification response");
-                return new AuthenticationResult<AuthenticatedTokenSession>(
-                    null,
-                    AuthenticationError.ServerError,
-                    "Ошибка обработки ответа сервера");
+                return AuthenticationError.ServerError;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during MFA verification");
-                return new AuthenticationResult<AuthenticatedTokenSession>(
-                    null,
-                    AuthenticationError.ServerError,
-                    "Произошла непредвиденная ошибка");
+                return AuthenticationError.ServerError;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<AuthenticationResult<AuthenticatedTokenSession>> RefreshAsync(
+        public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> RefreshAsync(
             string refreshToken,
             CancellationToken cancellationToken = default)
         {
@@ -182,13 +159,11 @@ namespace Gateway.Infrastructure.Clients
                     request,
                     cancellationToken);
 
-                return new AuthenticationResult<AuthenticatedTokenSession>(
-                    new AuthenticatedTokenSession(
+                return new AuthenticatedTokenSession(
                         response.AccessToken,
                         response.RefreshToken,
                         response.ExpiresIn,
-                        response.TokenType),
-                    AuthenticationError.None);
+                        response.TokenType);
             }
             catch (HttpRequestException ex)
             {
@@ -198,23 +173,17 @@ namespace Gateway.Infrastructure.Clients
             catch (JsonException ex)
             {
                 _logger.LogError(ex, "Error deserializing refresh token response");
-                return new AuthenticationResult<AuthenticatedTokenSession>(
-                    null,
-                    AuthenticationError.ServerError,
-                    "Ошибка обработки ответа сервера");
+                return AuthenticationError.ServerError;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during token refresh");
-                return new AuthenticationResult<AuthenticatedTokenSession>(
-                    null,
-                    AuthenticationError.ServerError,
-                    "Произошла непредвиденная ошибка");
+                return AuthenticationError.ServerError;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<AuthenticationResult> LogoutAsync(
+        public async Task<Result<AuthenticationError>> LogoutAsync(
             string accessToken,
             CancellationToken cancellationToken = default)
         {
@@ -226,7 +195,7 @@ namespace Gateway.Infrastructure.Clients
                 var response = await _httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
-                return new AuthenticationResult(AuthenticationError.None);
+                return Result<AuthenticationError>.Success();
             }
             catch (HttpRequestException ex)
             {
@@ -236,7 +205,7 @@ namespace Gateway.Infrastructure.Clients
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during logout");
-                return new AuthenticationResult(AuthenticationError.ServerError, "Произошла непредвиденная ошибка");
+                return AuthenticationError.ServerError;
             }
         }
 
@@ -273,7 +242,7 @@ namespace Gateway.Infrastructure.Clients
 
         #region Helper methods
 
-        private AuthenticationResult HandleHttpException(HttpRequestException ex)
+        private Result<AuthenticationError> HandleHttpException(HttpRequestException ex)
         {
             var error = ex.StatusCode switch
             {
@@ -285,10 +254,10 @@ namespace Gateway.Infrastructure.Clients
                 _ => AuthenticationError.NetworkError
             };
 
-            return new AuthenticationResult(error, ex.Message);
+            return error;
         }
 
-        private AuthenticationResult<T> HandleHttpException<T>(HttpRequestException ex)
+        private Result<T, AuthenticationError> HandleHttpException<T>(HttpRequestException ex)
         {
             var error = ex.StatusCode switch
             {
@@ -300,7 +269,7 @@ namespace Gateway.Infrastructure.Clients
                 _ => AuthenticationError.NetworkError
             };
 
-            return new AuthenticationResult<T>(default, error, ex.Message);
+            return error;
         }
 
         #endregion
