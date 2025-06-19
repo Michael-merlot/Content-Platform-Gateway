@@ -76,8 +76,7 @@ namespace Gateway.Infrastructure.Clients
                             MfaRequired: true,
                             AuthTokenSession: null,
                             MfaVerificationRequiredMetadata: new MfaVerificationMetadata(response.UserId)),
-                        AuthenticationError.None,
-                        null);
+                        AuthenticationError.None);
                 }
                 else
                 {
@@ -90,8 +89,7 @@ namespace Gateway.Infrastructure.Clients
                                 response.ExpiresIn,
                                 response.TokenType),
                             MfaVerificationRequiredMetadata: null),
-                        AuthenticationError.None,
-                        null);
+                        AuthenticationError.None);
                 }
             }
             catch (HttpRequestException ex)
@@ -142,8 +140,7 @@ namespace Gateway.Infrastructure.Clients
                         response.RefreshToken,
                         response.ExpiresIn,
                         response.TokenType),
-                    AuthenticationError.None,
-                    null);
+                    AuthenticationError.None);
             }
             catch (HttpRequestException ex)
             {
@@ -191,8 +188,7 @@ namespace Gateway.Infrastructure.Clients
                         response.RefreshToken,
                         response.ExpiresIn,
                         response.TokenType),
-                    AuthenticationError.None,
-                    null);
+                    AuthenticationError.None);
             }
             catch (HttpRequestException ex)
             {
@@ -230,7 +226,7 @@ namespace Gateway.Infrastructure.Clients
                 var response = await _httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
-                return new AuthenticationResult(AuthenticationError.None, null);
+                return new AuthenticationResult(AuthenticationError.None);
             }
             catch (HttpRequestException ex)
             {

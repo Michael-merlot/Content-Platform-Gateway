@@ -8,7 +8,7 @@ namespace Gateway.Core.Models.Auth;
 public sealed record AuthenticationResult<T>(
     T? Data,
     AuthenticationError Error,
-    string? ErrorDescription
+    string? ErrorDescription = null
 ) : AuthenticationResult(Error, ErrorDescription);
 
 /// <summary>Represents an authentication result.</summary>
@@ -16,7 +16,7 @@ public sealed record AuthenticationResult<T>(
 /// <param name="ErrorDescription">The error description, if any.</param>
 public record AuthenticationResult(
     AuthenticationError Error,
-    string? ErrorDescription
+    string? ErrorDescription = null
 )
 {
     /// <summary>Whether or not the operation succeeded.</summary>
