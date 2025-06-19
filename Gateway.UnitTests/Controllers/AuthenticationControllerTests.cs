@@ -37,7 +37,7 @@ public sealed class AuthenticationControllerTests
         LoginRequest loginRequest = new("user@example.com", "pwd");
 
         _authService.LoginAsync(loginRequest.Email, loginRequest.Password, CancellationToken.None)
-            .Returns(AuthenticationError.InvalidClient);
+            .Returns(AuthenticationError.WrongCredentials);
 
         IActionResult result = await _authenticationController.Login(loginRequest);
 
@@ -99,7 +99,7 @@ public sealed class AuthenticationControllerTests
         VerifyMfaRequest verifyMfaRequest = new(123, "bad");
 
         _authService.VerifyMultiFactorAsync(verifyMfaRequest.UserId, verifyMfaRequest.Code, CancellationToken.None)
-            .Returns(AuthenticationError.InvalidGrant);
+            .Returns(AuthenticationError.IncorrectMfaCode);
 
         IActionResult result = await _authenticationController.VerifyMfa(verifyMfaRequest);
 
@@ -128,7 +128,7 @@ public sealed class AuthenticationControllerTests
         RefreshRequest refreshRequest = new("rt");
 
         _authService.RefreshAsync(refreshRequest.RefreshToken, CancellationToken.None)
-            .Returns(AuthenticationError.InvalidGrant);
+            .Returns(AuthenticationError.WrongCredentials);
 
         IActionResult result = await _authenticationController.Refresh(refreshRequest);
 
@@ -166,7 +166,7 @@ public sealed class AuthenticationControllerTests
         _authenticationController.ControllerContext.HttpContext = BuildHttpContext("at");
 
         _authService.LogoutAsync("at", CancellationToken.None)
-            .Returns(AuthenticationError.InvalidGrant);
+            .Returns(AuthenticationError.WrongCredentials);
 
         IActionResult result = await _authenticationController.Logout();
 
