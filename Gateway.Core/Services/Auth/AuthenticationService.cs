@@ -15,18 +15,33 @@ public class AuthenticationService : IAuthenticationService
 
     /// <inheritdoc/>
     public async Task<Result<LoginResult, AuthenticationError>> LoginAsync(string email, string password,
-        CancellationToken cancellationToken = default) =>
-        await _apiClient.LoginAsync(email, password, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (email.Length > 256 || password.Length > 100)
+            return AuthenticationError.InvalidRequest;
+
+        return await _apiClient.LoginAsync(email, password, cancellationToken);
+    }
 
     /// <inheritdoc/>
     public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> VerifyMultiFactorAsync(int userId, string code,
-        CancellationToken cancellationToken = default) =>
-        await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (code.Length > 10)
+            return AuthenticationError.InvalidRequest;
+
+        return await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
+    }
 
     /// <inheritdoc/>
     public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> RefreshAsync(string refreshToken,
-        CancellationToken cancellationToken = default) =>
-        await _apiClient.RefreshAsync(refreshToken, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (refreshToken.Length > 2000)
+            return AuthenticationError.InvalidRequest;
+
+        return await _apiClient.RefreshAsync(refreshToken, cancellationToken);
+    }
 
     /// <inheritdoc/>
     public async Task<Result<AuthenticationError>> LogoutAsync(string accessToken, CancellationToken cancellationToken = default) =>

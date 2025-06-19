@@ -37,6 +37,8 @@ internal static class AuthenticationMapper
         error switch
         {
             AuthenticationError.None => StatusCodes.Status200OK,
+            AuthenticationError.WrongCredentials
+                or AuthenticationError.IncorrectMfaCode => StatusCodes.Status401Unauthorized,
             AuthenticationError.InvalidRequest => StatusCodes.Status400BadRequest,
             AuthenticationError.InvalidClient
                 or AuthenticationError.InvalidGrant => StatusCodes.Status401Unauthorized,

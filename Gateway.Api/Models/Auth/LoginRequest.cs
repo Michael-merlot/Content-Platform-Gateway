@@ -6,6 +6,6 @@ namespace Gateway.Api.Models.Auth;
 /// <param name="Email">User e-mail.</param>
 /// <param name="Password">User password.</param>
 public sealed record LoginRequest(
-    [Required] [EmailAddress] string Email,
+    [Required] [EmailAddress] [MaxLength(256)] string Email,
     [Required] [MaxLength(100)] string Password
 );

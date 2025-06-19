@@ -4,6 +4,8 @@ namespace Gateway.Core.Models.Auth;
 public enum AuthenticationError
 {
     None,
+    WrongCredentials,
+    IncorrectMfaCode,
     InvalidRequest,
     InvalidClient,
     InvalidGrant,
