@@ -56,6 +56,7 @@ builder.Host.UseSerilog((context, logConfig) =>
         .ReadFrom.Configuration(context.Configuration)
         .WriteTo.Console());
 
+// настройка поведения BackgroundService для предотвращения остановки приложения при ошибках
 builder.Services.Configure<HostOptions>(options => {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
@@ -149,6 +150,7 @@ builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
+// проверяем доступность Redis и настраиваем особенности работы приложения в зависимости от результата (либо локальное, либо с докером)
 bool useRedis = false;
 ConnectionMultiplexer redisConnection = null;
 
@@ -185,12 +187,14 @@ catch (Exception ex)
     logger.Warning(ex, "Ошибка подключения к Redis. Используются локальные альтернативы");
 }
 
+// общие сервисы, не зависящие от Redis
 builder.Services.AddSingleton<IMemoryCacheRepository, MemoryCacheRepository>();
 builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
 builder.Services.AddSingleton<ConfigurationSyncService>();
 builder.Services.AddSingleton<MetricsService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
 
+// конфигурация сервисов в зависимости от доступности Redis
 if (useRedis)
 {
     var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ??
@@ -246,6 +250,7 @@ else
     logger.Information("API Gateway использует локальный кэш. Горизонтальное масштабирование ограничено.");
 }
 
+// многоуровневое кэширование с разными стратегиями в зависимости от доступности Redis
 builder.Services.AddSingleton<IMultiLevelCacheRepository, MultiLevelCacheRepository>(sp =>
 {
     var memory = sp.GetRequiredService<IMemoryCacheRepository>();
@@ -259,7 +264,7 @@ builder.Services.AddScoped<ISubscriptionService, SubscriptionService>(sp =>
         sp.GetRequiredService<ICacheInvalidator>()
     )
 );
-
+// ConfigurationSyncService в качестве hosted service с защитой от ошибок
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ConfigurationSyncService>());
 
 if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
@@ -478,7 +483,6 @@ public class LocalCacheInvalidator : ICacheInvalidator
         return Task.CompletedTask;
     }
 
-    // Исправляем название метода на PublishInvalidationAsync
     public Task PublishInvalidationAsync(string key)
     {
         _logger.LogInformation("Локальная публикация инвалидации кэша для ключа: {Key}", key);
