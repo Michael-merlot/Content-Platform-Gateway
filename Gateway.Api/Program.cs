@@ -38,6 +38,11 @@ using System.Reflection;
 using Gateway.Core.Interfaces.Subscriptions;
 using Gateway.Core.Services.Subscriptions;
 using System.Net.Sockets;
+using Gateway.Infrastructure.Clients.Realtime;
+using Gateway.Core.Interfaces.Notifications;
+using Gateway.Core.Services.Notifications;
+using Gateway.Infrastructure.BackgroundServices;
+using Gateway.Infrastructure.Persistence.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
 var logger = Log.ForContext<Program>();
@@ -131,6 +136,36 @@ builder.Services.AddSwaggerGen(c =>
     c.TagActionsBy(api => new[] { api.GroupName ?? api.ActionDescriptor.RouteValues["controller"] });
     c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}");
 });
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigin",
+        builder =>
+        {
+            // В продакшене замените "*" на конкретные домены вашего фронтенда
+            builder.WithOrigins("http://localhost:3000", "http://localhost:5000") // Пример: ваш фронтенд
+                   .AllowAnyMethod()
+                   .AllowAnyHeader()
+                   .AllowCredentials(); // Необходимо для SignalR с авторизацией
+        });
+});
+
+// --- Регистрация сервисов для уведомлений ---
+// Репозиторий (для демонстрации в памяти, позже заменится на EF Core)
+builder.Services.AddSingleton<INotificationRepository, InMemoryNotificationRepository>();
+
+// Клиент реального времени (SignalR)
+builder.Services.AddSingleton<INotificationRealtimeClient, SignalRNotificationRealtimeClient>();
+
+// Сервис уведомлений
+builder.Services.AddTransient<INotificationService, NotificationService>();
+
+// SignalR
+builder.Services.AddSignalR();
+
+// Фоновая служба для отложенных/периодических уведомлений
+builder.Services.AddHostedService<DelayedNotificationHostedService>();
+// --- Конец регистрации сервисов для уведомлений ---
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
@@ -348,7 +383,7 @@ else
 
 app.UseHttpsRedirection();
 app.UseSession();
-
+app.UseRouting();
 // CORS конфигурация
 app.UseCors(policy =>
 {
@@ -361,6 +396,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<NotificationHub>("/notificationHub"); // Маппинг SignalR Hub
 
 app.Run();
 
