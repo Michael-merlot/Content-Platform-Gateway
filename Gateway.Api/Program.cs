@@ -30,6 +30,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -45,12 +46,25 @@ using Gateway.Infrastructure.BackgroundServices;
 using Gateway.Infrastructure.Persistence.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
+if (builder.Environment.IsDevelopment())
+{
+    string localConfigPath = Path.Combine(AppContext.BaseDirectory, "appsettings.Development.local.json");
+    if (File.Exists(localConfigPath))
+    {
+        builder.Configuration.AddJsonFile(localConfigPath, optional: true, reloadOnChange: true);
+    }
+}
 var logger = Log.ForContext<Program>();
 
 builder.Host.UseSerilog((context, logConfig) =>
     logConfig
         .ReadFrom.Configuration(context.Configuration)
         .WriteTo.Console());
+
+// настройка поведения BackgroundService для предотвращения остановки приложения при ошибках
+builder.Services.Configure<HostOptions>(options => {
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
 
 builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
@@ -171,21 +185,24 @@ builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
-// Проверяем доступность Redis
+// проверяем доступность Redis и настраиваем особенности работы приложения в зависимости от результата (либо локальное, либо с докером)
 bool useRedis = false;
 ConnectionMultiplexer redisConnection = null;
 
 try
 {
     var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ??
-        builder.Configuration["Redis:ConnectionString"];
+        builder.Configuration["Redis:ConnectionString"] ??
+        "localhost:6379,abortConnect=false,connectTimeout=2000";
 
     if (!string.IsNullOrEmpty(redisConnectionString))
     {
-        // Попытка подключения с коротким таймаутом
+        // попытка подключения с коротким таймаутом и опцией abortConnect=false
         var options = ConfigurationOptions.Parse(redisConnectionString);
         options.AbortOnConnectFail = false;
         options.ConnectTimeout = 2000; // 2 секунды таймаут
+        options.AsyncTimeout = 2000;
+        options.SyncTimeout = 2000;
 
         redisConnection = ConnectionMultiplexer.Connect(options);
         useRedis = redisConnection.IsConnected;
@@ -205,12 +222,19 @@ catch (Exception ex)
     logger.Warning(ex, "Ошибка подключения к Redis. Используются локальные альтернативы");
 }
 
-// Конфигурация сервисов в зависимости от доступности Redis
+// общие сервисы, не зависящие от Redis
+builder.Services.AddSingleton<IMemoryCacheRepository, MemoryCacheRepository>();
+builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
+builder.Services.AddSingleton<ConfigurationSyncService>();
+builder.Services.AddSingleton<MetricsService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
+
+// конфигурация сервисов в зависимости от доступности Redis
 if (useRedis)
 {
-    // Настройка с использованием Redis
     var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ??
-        builder.Configuration["Redis:ConnectionString"];
+        builder.Configuration["Redis:ConnectionString"] ??
+        "localhost:6379,abortConnect=false";
 
     builder.Services.AddStackExchangeRedisCache(options =>
     {
@@ -226,20 +250,20 @@ if (useRedis)
         options.Cookie.IsEssential = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
-
     builder.Services.AddDataProtection()
         .PersistKeysToStackExchangeRedis(redisConnection, "DataProtection-Keys");
 
     builder.Services.AddSingleton<IDistributedCacheService, RedisDistributedCache>();
+    builder.Services.AddSingleton<ICacheInvalidator, RedisCacheInvalidator>();
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
+    builder.Services.AddHostedService<RedisCacheInvalidationListener>();
 
-    // Настройка health checks
     builder.Services.AddHealthChecks()
         .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" })
         .AddRedis(redisConnectionString, name: "redis-cache", tags: new[] { "ready", "cache" });
 }
 else
 {
-    // Настройка с использованием локального кэша
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(options =>
     {
@@ -252,28 +276,16 @@ else
 
     builder.Services.AddDataProtection();
 
-    // Используем кастомный IMemoryCache для InMemoryDistributedCache
-    builder.Services.AddSingleton<IMemoryCache>(sp => new MemoryCache(new MemoryCacheOptions()));
     builder.Services.AddSingleton<IDistributedCacheService, InMemoryDistributedCache>();
+    builder.Services.AddSingleton<ICacheInvalidator, LocalCacheInvalidator>();
 
-    // Health checks без Redis
     builder.Services.AddHealthChecks()
         .AddCheck<ApiGatewayHealthCheck>("api-gateway", tags: new[] { "ready", "api" });
 
     logger.Information("API Gateway использует локальный кэш. Горизонтальное масштабирование ограничено.");
 }
 
-// Общие сервисы, не зависящие от Redis
-builder.Services.AddSingleton<CircuitBreakerPolicyProvider>();
-
-// Настраиваем ConfigurationSyncService с IServiceScopeFactory вместо прямой зависимости от IDistributedCacheService
-builder.Services.AddSingleton<ConfigurationSyncService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<ConfigurationSyncService>());
-
-builder.Services.AddSingleton<MetricsService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsService>());
-builder.Services.AddSingleton<IMemoryCacheRepository, MemoryCacheRepository>();
-
+// многоуровневое кэширование с разными стратегиями в зависимости от доступности Redis
 builder.Services.AddSingleton<IMultiLevelCacheRepository, MultiLevelCacheRepository>(sp =>
 {
     var memory = sp.GetRequiredService<IMemoryCacheRepository>();
@@ -281,22 +293,15 @@ builder.Services.AddSingleton<IMultiLevelCacheRepository, MultiLevelCacheReposit
     return new MultiLevelCacheRepository(memory, distributed);
 });
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")
-        ?? builder.Configuration["Redis:ConnectionString"]
-        ?? "localhost:6379,abortConnect=false"));
-
-builder.Services.AddSingleton<ICacheInvalidator, RedisCacheInvalidator>();
-builder.Services.AddHostedService<RedisCacheInvalidationListener>();
-
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>(sp =>
     new SubscriptionService(
         sp.GetRequiredService<IMultiLevelCacheRepository>(),
         sp.GetRequiredService<ICacheInvalidator>()
     )
 );
+// ConfigurationSyncService в качестве hosted service с защитой от ошибок
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ConfigurationSyncService>());
 
-// Проверяем доступность внешних сервисов для healthchecks
 if (!string.IsNullOrEmpty(builder.Configuration["ServiceConfiguration:LaravelApi"]))
 {
     try
@@ -496,3 +501,29 @@ public class InMemoryDistributedCache : IDistributedCacheService
         return Task.CompletedTask;
     }
 }
+
+/// <summary>
+/// Локальная реализация ICacheInvalidator для работы без Redis
+/// </summary>
+public class LocalCacheInvalidator : ICacheInvalidator
+{
+    private readonly ILogger<LocalCacheInvalidator> _logger;
+
+    public LocalCacheInvalidator(ILogger<LocalCacheInvalidator> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task InvalidateCacheAsync(string key)
+    {
+        _logger.LogInformation("Локальная инвалидация кэша для ключа: {Key}", key);
+        return Task.CompletedTask;
+    }
+
+    public Task PublishInvalidationAsync(string key)
+    {
+        _logger.LogInformation("Локальная публикация инвалидации кэша для ключа: {Key}", key);
+        return Task.CompletedTask;
+    }
+}
+
