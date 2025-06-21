@@ -27,10 +27,21 @@ public class AuthenticationController : ControllerBase
     /// <param name="loginRequest">Login request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication tokens.</returns>
+    /// <response code="200">A login response.</response>
+    /// <response code="400">Invalid request data.</response>
+    /// <response code="401">Wrong credentials provided.</response>
+    /// <response code="403">Forbidden.</response>
+    /// <response code="404">Entity not found.</response>
+    /// <response code="502">Bad gateway.</response>
+    /// <response code="503">The service is unavailable.</response>
     [HttpPost]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> Login(LoginRequest loginRequest, CancellationToken cancellationToken = default)
     {
         Result<LoginResult, AuthenticationError> result = await _authenticationService
@@ -51,11 +62,22 @@ public class AuthenticationController : ControllerBase
     /// <param name="verifyMfaRequest">MFA verification request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication tokens.</returns>
+    /// <response code="200">An authenticated response.</response>
+    /// <response code="400">Invalid request data.</response>
+    /// <response code="401">Wrong credentials provided.</response>
+    /// <response code="403">Forbidden.</response>
+    /// <response code="404">Entity not found.</response>
+    /// <response code="502">Bad gateway.</response>
+    /// <response code="503">The service is unavailable.</response>
     [HttpPost]
     [ActionName("verify/mfa")]
     [ProducesResponseType<AuthenticatedResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> VerifyMfa(VerifyMfaRequest verifyMfaRequest, CancellationToken cancellationToken = default)
     {
         Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
@@ -69,10 +91,21 @@ public class AuthenticationController : ControllerBase
     /// <param name="refreshRequest">Refresh request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Authentication tokens.</returns>
+    /// <response code="200">An authenticated response.</response>
+    /// <response code="400">Invalid request data.</response>
+    /// <response code="401">Wrong credentials provided.</response>
+    /// <response code="403">Forbidden.</response>
+    /// <response code="404">Entity not found.</response>
+    /// <response code="502">Bad gateway.</response>
+    /// <response code="503">The service is unavailable.</response>
     [HttpPost]
     [ProducesResponseType<AuthenticatedResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> Refresh(RefreshRequest refreshRequest, CancellationToken cancellationToken = default)
     {
         Result<AuthenticatedTokenSession, AuthenticationError> result = await _authenticationService
@@ -86,11 +119,22 @@ public class AuthenticationController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <remarks>The access token is fetched from the <c>Authorization</c> header.</remarks>
     /// <returns></returns>
+    /// <response code="204">An operation completed successfully.</response>
+    /// <response code="400">Invalid request data.</response>
+    /// <response code="401">Wrong credentials provided.</response>
+    /// <response code="403">Forbidden.</response>
+    /// <response code="404">Entity not found.</response>
+    /// <response code="502">Bad gateway.</response>
+    /// <response code="503">The service is unavailable.</response>
     [HttpPost]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, MediaTypeNames.Application.ProblemJson)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway, MediaTypeNames.Application.ProblemJson)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
         string? accessToken = await HttpContext.GetTokenAsync("access_token");
