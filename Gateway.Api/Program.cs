@@ -142,6 +142,8 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 
+    c.SupportNonNullableReferenceTypes();
+
     c.UseAllOfForInheritance();
     c.UseOneOfForPolymorphism();
 
