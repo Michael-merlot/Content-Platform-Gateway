@@ -1,4 +1,5 @@
 using Gateway.Core.Interfaces.Auth;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 
 using Microsoft.AspNetCore.Authorization;
@@ -12,10 +13,10 @@ namespace Gateway.Api.Auth;
 public abstract class BaseDynamicPermissionHandler<T> : AuthorizationHandler<T>
     where T : IAuthorizationRequirement
 {
-    protected readonly IEndpointRepository EndpointRepository;
+    protected readonly IAuthorizationManagementService AuthorizationManagementService;
 
-    protected BaseDynamicPermissionHandler(IEndpointRepository endpointRepository) =>
-        EndpointRepository = endpointRepository;
+    protected BaseDynamicPermissionHandler(IAuthorizationManagementService authorizationManagementService) =>
+        AuthorizationManagementService = authorizationManagementService;
 
     /// <inheritdoc/>
     protected override async Task HandleRequirementAsync(
@@ -66,9 +67,12 @@ public abstract class BaseDynamicPermissionHandler<T> : AuthorizationHandler<T>
             return;
         }
 
-        List<string> requiredPermissionsNames = (await EndpointRepository.GetRequiredPermissionsAsync(controller, action, httpMethod))
+        Result<IEnumerable<Permission>, AuthorizationManagementError> endpointPermissionRequirementsResult =
+            await AuthorizationManagementService.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod);
+
+        List<string> requiredPermissionsNames = endpointPermissionRequirementsResult.Value?
             .Select(x => x.Name)
-            .ToList();
+            .ToList() ?? [];
 
         if (requiredPermissionsNames.Count == 0)
         {
@@ -95,7 +99,9 @@ public abstract class BaseDynamicPermissionHandler<T> : AuthorizationHandler<T>
 
     /// <summary>
     /// Makes a decision if authorization is allowed when the endpoint requirements are empty. Should not call
-    /// <see cref="AuthorizationHandlerContext.Succeed(IAuthorizationRequirement)"/> or <see cref="AuthorizationHandlerContext.Fail()"/>.
+    /// <see
+    ///     cref="AuthorizationHandlerContext.Succeed(IAuthorizationRequirement)"/>
+    /// or <see cref="AuthorizationHandlerContext.Fail()"/>.
     /// </summary>
     /// <param name="context">The authorization context.</param>
     /// <param name="requirement">The requirement to evaluate.</param>

@@ -1,3 +1,5 @@
+using EntityFramework.Exceptions.PostgreSQL;
+
 using Gateway.Core.Models.Auth;
 
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +31,13 @@ public class AuthDbContext : DbContext
     public DbSet<EndpointPermission> EndpointPermissions { get; set; }
 
     public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options) { }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+
+        optionsBuilder.UseExceptionProcessor();
+    }
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder builder)

@@ -77,7 +77,9 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
 builder.Services.AddScoped<IEndpointRepository, EndpointRepository>();
+builder.Services.AddScoped<IUserAuthorizationRepository, UserAuthorizationRepository>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IAuthorizationManagementService, AuthorizationManagementService>();
 
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();

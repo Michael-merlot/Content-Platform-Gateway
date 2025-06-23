@@ -1,4 +1,5 @@
 using Gateway.Core.Interfaces.Auth;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -10,14 +11,10 @@ namespace Gateway.Api.Auth;
 /// <summary>Events for the <c>JwtBearer</c> that enrich the claims with user's roles and permissions.</summary>
 public class PermissionEnrichmentJwtBearerEvents : JwtBearerEvents
 {
-    private readonly IRoleRepository _roleRepository;
-    private readonly IPermissionRepository _permissionRepository;
+    private readonly IAuthorizationManagementService _authorizationManagementService;
 
-    public PermissionEnrichmentJwtBearerEvents(IRoleRepository roleRepository, IPermissionRepository permissionRepository)
-    {
-        _roleRepository = roleRepository;
-        _permissionRepository = permissionRepository;
-    }
+    public PermissionEnrichmentJwtBearerEvents(IAuthorizationManagementService authorizationManagementService) =>
+        _authorizationManagementService = authorizationManagementService;
 
     /// <inheritdoc/>
     public override async Task TokenValidated(TokenValidatedContext context)
@@ -33,19 +30,27 @@ public class PermissionEnrichmentJwtBearerEvents : JwtBearerEvents
         if (context.Principal?.Identity is not ClaimsIdentity identity)
             return;
 
-        IEnumerable<Role> roles = await _roleRepository.GetRolesByUserIdAsync(userId);
+        Result<IEnumerable<Role>, AuthorizationManagementError> rolesResult =
+            await _authorizationManagementService.GetUserRolesAsync(userId);
 
-        foreach (Role role in roles)
+        if (rolesResult.IsSuccess)
         {
-            identity.AddClaim(new Claim(ClaimTypes.Role, role.Name));
+            foreach (Role role in rolesResult.Value!)
+            {
+                identity.AddClaim(new Claim(ClaimTypes.Role, role.Name));
 
-            if (role.IsAdmin && !identity.HasClaim(x => x.Type == ExtraClaimTypes.IsAdmin))
-                identity.AddClaim(new Claim(ExtraClaimTypes.IsAdmin, true.ToString()));
+                if (role.IsAdmin && !identity.HasClaim(x => x.Type == ExtraClaimTypes.IsAdmin))
+                    identity.AddClaim(new Claim(ExtraClaimTypes.IsAdmin, true.ToString()));
+            }
         }
 
-        IEnumerable<Permission> permissions = await _permissionRepository.GetPermissionsByUserIdAsync(userId);
+        Result<IEnumerable<Permission>, AuthorizationManagementError> permissionsResult =
+            await _authorizationManagementService.GetUserPermissionsAsync(userId);
 
-        foreach (Permission permission in permissions)
+        if (!permissionsResult.IsSuccess)
+            return;
+
+        foreach (Permission permission in permissionsResult.Value!)
             identity.AddClaim(new Claim(ExtraClaimTypes.Permission, permission.Name));
     }
 }
