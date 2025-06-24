@@ -3,6 +3,7 @@ using EntityFramework.Exceptions.Common;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
+using Gateway.Infrastructure.Persistence.Auth;
 
 using Microsoft.EntityFrameworkCore;
 

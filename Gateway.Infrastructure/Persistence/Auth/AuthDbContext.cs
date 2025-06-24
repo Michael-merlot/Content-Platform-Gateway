@@ -4,7 +4,7 @@ using Gateway.Core.Models.Auth;
 
 using Microsoft.EntityFrameworkCore;
 
-namespace Gateway.Infrastructure.Auth;
+namespace Gateway.Infrastructure.Persistence.Auth;
 
 /// <summary>Represents the <see cref="DbContext"/> for managing the auth.</summary>
 public class AuthDbContext : DbContext

@@ -43,6 +43,8 @@ using StackExchange.Redis;
 using System.Reflection;
 using Gateway.Core.Interfaces.Subscriptions;
 using Gateway.Core.Services.Subscriptions;
+using Gateway.Infrastructure.Persistence.Auth;
+
 using System.Net.Sockets;
 
 var builder = WebApplication.CreateBuilder(args);
