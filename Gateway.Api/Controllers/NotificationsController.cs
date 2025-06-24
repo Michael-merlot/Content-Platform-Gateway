@@ -2,10 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Gateway.Core.Interfaces.Notifications; // Используем интерфейс сервиса из Core
+using Gateway.Core.Interfaces.Notifications;
 //using Gateway.Core.DTOs.Notifications; // Используем DTO из Core
 using Gateway.Api.Models.Notifications; // Используем модели запросов из Api
-using Microsoft.AspNetCore.Authorization; // Если нужна авторизация
 
 namespace Gateway.Api.Controllers;
 

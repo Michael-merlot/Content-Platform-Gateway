@@ -2,6 +2,7 @@ using Gateway.Core.Models.Notifications;
 
 namespace Gateway.Core.DTOs;
 
+//должен быть в в Api/Models/Notifications, но остальные файлы не видят.
 public class NotificationDto
 {
     public Guid Id { get; set; }

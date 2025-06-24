@@ -156,8 +156,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowSpecificOrigin",
         builder =>
         {
-            // В продакшене замените "*" на конкретные домены вашего фронтенда
-            builder.WithOrigins("http://localhost:3000", "http://localhost:5000") // Пример: ваш фронтенд
+            builder.WithOrigins("http://localhost:3000", "http://localhost:5000") 
                    .AllowAnyMethod()
                    .AllowAnyHeader()
                    .AllowCredentials(); // Необходимо для SignalR с авторизацией
@@ -165,7 +164,7 @@ builder.Services.AddCors(options =>
 });
 
 // --- Регистрация сервисов для уведомлений ---
-// Репозиторий (для демонстрации в памяти, позже заменится на EF Core)
+// Репозиторий (для демонстрации в памяти, позже заменить на EF Core)
 builder.Services.AddSingleton<INotificationRepository, InMemoryNotificationRepository>();
 
 // Клиент реального времени (SignalR)

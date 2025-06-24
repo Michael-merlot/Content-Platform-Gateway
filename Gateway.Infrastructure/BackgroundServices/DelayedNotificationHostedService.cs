@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection; // Для IServiceScopeFactory
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,14 +28,12 @@ namespace Gateway.Infrastructure.BackgroundServices
             {
                 _logger.LogInformation("Delayed Notification Service working at: {time}", DateTimeOffset.Now);
 
-                // Здесь должна быть логика получения отложенных уведомлений из хранилища.
-                // Для примера, отправим тестовое уведомление каждые 30 секунд условному пользователю.
+                // пример - отправка тестового уведомления каждые 30 секунд условному пользователю.
                 using (var scope = _scopeFactory.CreateScope())
                 {
                     var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
                     try
                     {
-                        // !!! В реальной системе вам нужно будет выбрать реального пользователя или логику рассылки !!!
                         // Здесь просто пример
                         var testUserId = Guid.Parse("A1B2C3D4-E5F6-7890-1234-567890ABCDEF");
                         await notificationService.CreateAndSendNotificationAsync(

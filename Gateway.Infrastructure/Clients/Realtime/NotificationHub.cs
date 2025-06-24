@@ -24,7 +24,6 @@ public class NotificationHub : Hub
         return base.OnDisconnectedAsync(exception);
     }
 
-    // Этот метод может быть вызван клиентом, но мы будем отправлять с сервера.
     public async Task SendTestMessage(string message)
     {
         await Clients.All.SendAsync("ReceiveMessage", message);
