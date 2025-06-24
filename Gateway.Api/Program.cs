@@ -90,6 +90,7 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddScoped<IAuthorizationHandler, DynamicPermissionHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AdminUntilDynamicPermissionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, DefaultDynamicPermissionHandler>();
 builder.Services.AddScoped<PermissionEnrichmentJwtBearerEvents>();
 
 builder.Services
@@ -129,7 +130,8 @@ builder.Services
 builder.Services.AddAuthorizationBuilder()
     .SetDefaultPolicy(DynamicPermissionPolicies.RequireDynamicPermissionPolicy)
     .AddPolicy(DynamicPermissionPolicies.RequireAdminPolicyName, DynamicPermissionPolicies.RequireAdminPolicy)
-    .AddPolicy(DynamicPermissionPolicies.RequireAdminUntilDynamicPolicyName, DynamicPermissionPolicies.RequireAdminUntilDynamicPolicy);
+    .AddPolicy(DynamicPermissionPolicies.RequireAdminUntilDynamicPolicyName, DynamicPermissionPolicies.RequireAdminUntilDynamicPolicy)
+    .AddPolicy(DynamicPermissionPolicies.RequireDynamicPermissionWithDefaultPolicyName, DynamicPermissionPolicies.RequireDynamicPermissionWithDefaultPolicy);
 
 builder.Services.AddControllers();
 

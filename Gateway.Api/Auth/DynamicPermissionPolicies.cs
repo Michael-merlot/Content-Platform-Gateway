@@ -36,4 +36,16 @@ public static class DynamicPermissionPolicies
             .RequireAuthenticatedUser()
             .AddRequirements(new AdminUntilDynamicPermissionRequirement())
             .Build();
+
+    /// <summary>
+    /// The name of the policy which requires dynamic permission and has default fallback if not configured.
+    /// </summary>
+    public const string RequireDynamicPermissionWithDefaultPolicyName = "RequireDynamicPermissionWithDefault";
+
+    /// <summary>The policy which requires dynamic permission and has default fallback if not configured.</summary>
+    public static AuthorizationPolicy RequireDynamicPermissionWithDefaultPolicy =>
+        new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .AddRequirements(new DefaultDynamicPermissionRequirement())
+            .Build();
 }

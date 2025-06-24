@@ -29,50 +29,19 @@ public abstract class BaseDynamicPermissionHandler<T> : AuthorizationHandler<T>
             return;
         }
 
-        string? controller;
-        string? action;
-        string httpMethod;
-
-        switch (context.Resource)
-        {
-            case HttpContext httpContext:
-            {
-                ControllerActionDescriptor? controllerActionDescriptor =
-                    httpContext.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
-
-                controller = controllerActionDescriptor?.ControllerName;
-                action = controllerActionDescriptor?.ActionName;
-                httpMethod = httpContext.Request.Method;
-
-                break;
-            }
-            case AuthorizationFilterContext { ActionDescriptor: ControllerActionDescriptor controllerActionDescriptor } afc:
-            {
-                controller = controllerActionDescriptor.ControllerName;
-                action = controllerActionDescriptor.ActionName;
-                httpMethod = afc.HttpContext.Request.Method;
-
-                break;
-            }
-            default:
-                return;
-        }
-
-        if (controller is null || action is null)
-            return;
-
         if (context.User.HasClaim(ExtraClaimTypes.IsAdmin, true.ToString()))
         {
             context.Succeed(requirement);
             return;
         }
 
-        Result<IEnumerable<Permission>, AuthorizationManagementError> endpointPermissionRequirementsResult =
-            await AuthorizationManagementService.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod);
+        Result<List<string>, RequiredPermissionsBuildError> requiredPermissionsResult =
+            await BuildRequiredPermissions(context, requirement);
 
-        List<string> requiredPermissionsNames = endpointPermissionRequirementsResult.Value?
-            .Select(x => x.Name)
-            .ToList() ?? [];
+        if (!requiredPermissionsResult.IsSuccess)
+            return;
+
+        List<string> requiredPermissionsNames = requiredPermissionsResult.Value!;
 
         if (requiredPermissionsNames.Count == 0)
         {
@@ -99,13 +68,60 @@ public abstract class BaseDynamicPermissionHandler<T> : AuthorizationHandler<T>
 
     /// <summary>
     /// Makes a decision if authorization is allowed when the endpoint requirements are empty. Should not call
-    /// <see
-    ///     cref="AuthorizationHandlerContext.Succeed(IAuthorizationRequirement)"/>
-    /// or <see cref="AuthorizationHandlerContext.Fail()"/>.
+    /// <see cref="AuthorizationHandlerContext.Succeed(IAuthorizationRequirement)"/> or <see cref="AuthorizationHandlerContext.Fail()"/>.
     /// </summary>
     /// <param name="context">The authorization context.</param>
     /// <param name="requirement">The requirement to evaluate.</param>
     /// <returns><c>true</c> if authorization is allowed, <c>false</c> otherwise.</returns>
     protected virtual bool HandleEmptyEndpointRequirements(AuthorizationHandlerContext context, T requirement) =>
         true;
+
+    /// <summary>Builds a collection of required permissions.</summary>
+    /// <param name="context">The authorization context.</param>
+    /// <param name="requirement">The requirement to evaluate.</param>
+    /// <returns>
+    /// The collection of permission requirements or <c>null</c> if it's impossible to build it for the given context.
+    /// </returns>
+    protected virtual async Task<Result<List<string>, RequiredPermissionsBuildError>> BuildRequiredPermissions(
+        AuthorizationHandlerContext context, T requirement)
+    {
+        string? controller;
+        string? action;
+        string httpMethod;
+
+        switch (context.Resource)
+        {
+            case HttpContext httpContext:
+            {
+                ControllerActionDescriptor? controllerActionDescriptor =
+                    httpContext.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
+
+                controller = controllerActionDescriptor?.ControllerName;
+                action = controllerActionDescriptor?.ActionName;
+                httpMethod = httpContext.Request.Method;
+
+                break;
+            }
+            case AuthorizationFilterContext { ActionDescriptor: ControllerActionDescriptor controllerActionDescriptor } afc:
+            {
+                controller = controllerActionDescriptor.ControllerName;
+                action = controllerActionDescriptor.ActionName;
+                httpMethod = afc.HttpContext.Request.Method;
+
+                break;
+            }
+            default:
+                return RequiredPermissionsBuildError.InappropriateContext;
+        }
+
+        if (controller is null || action is null)
+            return RequiredPermissionsBuildError.InappropriateContext;
+
+        Result<IEnumerable<Permission>, AuthorizationManagementError> endpointPermissionRequirementsResult =
+            await AuthorizationManagementService.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod);
+
+        return endpointPermissionRequirementsResult.Match<Result<List<string>, RequiredPermissionsBuildError>>(
+            value => value.Select(x => x.Name).ToList(),
+            _ => RequiredPermissionsBuildError.EndpointNotFound);
+    }
 }

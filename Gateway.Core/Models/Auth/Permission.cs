@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Gateway.Core.Models.Auth;
 
 /// <summary>Represents an authorization permission.</summary>
@@ -17,4 +19,14 @@ public class Permission
 
     /// <summary>The associations between this permission and endpoints.</summary>
     public ICollection<EndpointPermission> EndpointPermissions { get; set; } = null!;
+
+    public Permission() { }
+
+    [SetsRequiredMembers]
+    public Permission(long id, string name, string? description)
+    {
+        Id = id;
+        Name = name;
+        Description = description;
+    }
 }
