@@ -43,6 +43,7 @@ using StackExchange.Redis;
 using System.Reflection;
 using Gateway.Core.Interfaces.Subscriptions;
 using Gateway.Core.Services.Subscriptions;
+using Gateway.Infrastructure;
 using Gateway.Infrastructure.Persistence.Auth;
 
 using System.Net.Sockets;
@@ -73,8 +74,10 @@ builder.Services.AddOptions<AuthOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString(AuthDbContext.ConnectionStringName)));
+builder.Services.AddDbContext<AuthDbContext>(options => options
+    .UseNpgsql(builder.Configuration.GetConnectionString(AuthDbContext.ConnectionStringName),
+        npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(IInfrastructureMarker).Assembly))
+    .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
@@ -359,6 +362,14 @@ builder.Services.AddHttpClient<ResilientHttpClient>((sp, client) =>
 .AddHttpMessageHandler(() => new TimeoutHandler(TimeSpan.FromSeconds(10)));
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    using IServiceScope scope = app.Services.CreateScope();
+    AuthDbContext authDbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+
+    await authDbContext.Database.MigrateAsync();
+}
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();

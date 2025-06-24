@@ -46,6 +46,24 @@ public class AuthDbContext : DbContext
 
         builder.HasDefaultSchema("auth");
 
+        builder.Entity<Role>(e =>
+        {
+            e.ToTable("roles");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Name)
+                .IsUnique();
+            e.Property(x => x.Name)
+                .HasMaxLength(100);
+
+            // Seed the admin role
+            e.HasData(new Role
+            {
+                Id = 1,
+                Name = "Admin",
+                IsAdmin = true
+            });
+        });
+
         builder.Entity<UserRole>(e =>
         {
             e.ToTable("user_roles");
@@ -57,16 +75,13 @@ public class AuthDbContext : DbContext
             e.HasOne(x => x.Role)
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(x => x.RoleId);
-        });
 
-        builder.Entity<Role>(e =>
-        {
-            e.ToTable("roles");
-            e.HasKey(x => x.Id);
-            e.HasIndex(x => x.Name)
-                .IsUnique();
-            e.Property(x => x.Name)
-                .HasMaxLength(100);
+            // Make the first user in the system an admin by default
+            e.HasData(new UserRole
+            {
+                UserId = 1,
+                RoleId = 1
+            });
         });
 
         builder.Entity<Permission>(e =>
@@ -79,6 +94,8 @@ public class AuthDbContext : DbContext
                 .HasMaxLength(100);
             e.Property(x => x.Description)
                 .HasMaxLength(500);
+
+            e.HasData(DefaultPermissions.GetPermissions());
         });
 
         builder.Entity<RolePermission>(e =>
