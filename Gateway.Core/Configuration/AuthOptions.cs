@@ -11,4 +11,9 @@ public class AuthOptions
     /// <summary>Authority to fetch JWKS from.</summary>
     [Required]
     public required Uri Authority { get; set; }
+
+    /// <summary>
+    /// Sepcifies whether or not the authentication should use localhost issuer instead of trying to get JWKS in development environment
+    /// </summary>
+    public bool UseLocalhostIssuerInDevelopment { get; set; } = false;
 }

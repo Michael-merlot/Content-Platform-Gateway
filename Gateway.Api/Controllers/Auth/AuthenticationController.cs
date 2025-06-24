@@ -6,9 +6,12 @@ using Gateway.Core.Models.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Mime;
+using System.Security.Claims;
 
 using IAuthenticationService = Gateway.Core.Interfaces.Auth.IAuthenticationService;
 
@@ -19,9 +22,13 @@ namespace Gateway.Api.Controllers.Auth;
 public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public AuthenticationController(IAuthenticationService authenticationService) =>
+    public AuthenticationController(IAuthenticationService authenticationService, IWebHostEnvironment webHostEnvironment)
+    {
         _authenticationService = authenticationService;
+        _webHostEnvironment = webHostEnvironment;
+    }
 
     /// <summary>Authenticates the user.</summary>
     /// <param name="loginRequest">Login request.</param>
@@ -148,4 +155,29 @@ public class AuthenticationController : ControllerBase
         return result.Match(NoContent,
             error => error.ToProblemDetails(this));
     }
+
+#if DEBUG // It's not possible to easily exclude from openapi by environment, so we exclude whole endpoint by the build configuration
+    /// <summary>Issues a dev token for the user 1.</summary>
+    /// <returns>The issued token.</returns>
+    [HttpPost]
+    [ProducesResponseType<string>(StatusCodes.Status200OK, MediaTypeNames.Text.Plain)]
+    public IActionResult IssueDevToken()
+    {
+        // Additional check just in case
+        if (!_webHostEnvironment.IsDevelopment())
+            return NotFound();
+
+        // This is synchronized with token validation settings in configuration before AddJwtBearer()
+        SigningCredentials credentials =
+            new(new SymmetricSecurityKey("do_not_use_this_key_in_production"u8.ToArray()), SecurityAlgorithms.HmacSha256);
+
+        JwtSecurityTokenHandler tokenHandler = new();
+        JwtSecurityToken? token = tokenHandler.CreateJwtSecurityToken("localhost", "localhost",
+            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "1")]),
+            expires: DateTime.UtcNow.AddYears(100),
+            signingCredentials: credentials);
+
+        return Ok(token.RawData);
+    }
+#endif
 }

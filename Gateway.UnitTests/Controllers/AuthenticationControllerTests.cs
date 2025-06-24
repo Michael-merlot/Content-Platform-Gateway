@@ -6,6 +6,7 @@ using Gateway.Core.Models.Auth;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,10 +24,11 @@ namespace Gateway.UnitTests.Controllers;
 public sealed class AuthenticationControllerTests
 {
     private readonly IAuthenticationService _authService = Substitute.For<IAuthenticationService>();
+    private readonly IWebHostEnvironment _webHostEnvironment = Substitute.For<IWebHostEnvironment>();
     private readonly AuthenticationController _authenticationController;
 
     public AuthenticationControllerTests() =>
-        _authenticationController = new AuthenticationController(_authService)
+        _authenticationController = new AuthenticationController(_authService, _webHostEnvironment)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

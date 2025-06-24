@@ -101,7 +101,7 @@ builder.Services
 
         options.Authority = authOptions.Value.Authority.ToString();
 
-        options.TokenValidationParameters = new TokenValidationParameters
+        TokenValidationParameters tokenValidationParameters = new()
         {
             ValidateIssuer = true,
             ValidateAudience = true,
@@ -109,6 +109,16 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+
+        if (builder.Environment.IsDevelopment() && authOptions.Value.UseLocalhostIssuerInDevelopment)
+        {
+            // This is synchronized with dev token issuance in IssueDevToken() in AuthenticationHandler
+            tokenValidationParameters.IssuerSigningKey = new SymmetricSecurityKey("do_not_use_this_key_in_production"u8.ToArray());
+            tokenValidationParameters.ValidIssuer = "localhost";
+            tokenValidationParameters.ValidAudience = "localhost";
+        }
+
+        options.TokenValidationParameters = tokenValidationParameters;
 
         options.EventsType = typeof(PermissionEnrichmentJwtBearerEvents);
     })
