@@ -481,7 +481,7 @@ public class InMemoryDistributedCache : IDistributedCacheService
         return Task.FromResult(_keysTracker.ContainsKey(key));
     }
 
-    public Task<T> GetAsync<T>(string key) where T : class
+    public Task<T?> GetAsync<T>(string key)
     {
         if (_memoryCache.TryGetValue(key, out string data) && !string.IsNullOrEmpty(data))
         {
@@ -496,7 +496,7 @@ public class InMemoryDistributedCache : IDistributedCacheService
             }
         }
 
-        return Task.FromResult<T>(null);
+        return Task.FromResult<T?>(default);
     }
 
     public Task RemoveAsync(string key)
@@ -506,7 +506,7 @@ public class InMemoryDistributedCache : IDistributedCacheService
         return Task.CompletedTask;
     }
 
-    public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class
+    public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
     {
         var options = new MemoryCacheEntryOptions();
 

@@ -25,7 +25,7 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
             return !string.IsNullOrEmpty(data);
         }
 
-        public async Task<T> GetAsync<T>(string key) where T : class
+        public async Task<T?> GetAsync<T>(string key)
         {
             try
             {
@@ -34,7 +34,7 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
                 if (string.IsNullOrEmpty(data))
                 {
                     _logger.LogDebug("Cache(Redis) miss for key {Key}", key);
-                    return null;
+                    return default;
                 }
 
                 _logger.LogDebug("Cache(Redis) hit for key {Key}", key);
@@ -43,7 +43,7 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting value from cache(Redis) for key {Key}", key);
-                return null;
+                return default;
             }
         }
 
@@ -59,7 +59,7 @@ namespace Gateway.Infrastructure.Persistence.DistributedCache
                 _logger.LogError(ex, "Error removing key {Key} from cache(Redis)", key);
             }
         }
-        public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class
+        public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
         {
             try
             {
