@@ -61,8 +61,7 @@ var logger = Log.ForContext<Program>();
 
 builder.Host.UseSerilog((context, logConfig) =>
     logConfig
-        .ReadFrom.Configuration(context.Configuration)
-        .WriteTo.Console());
+        .ReadFrom.Configuration(context.Configuration));
 
 // настройка поведения BackgroundService для предотвращения остановки приложения при ошибках
 builder.Services.Configure<HostOptions>(options => {
