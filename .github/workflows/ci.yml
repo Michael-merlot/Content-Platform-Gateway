@@ -1,0 +1,46 @@
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+      - name: Restore packages
+        run: dotnet restore content-platform-gateway.sln
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore content-platform-gateway.sln
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: '**/bin/Release/net*/**'
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+      - name: Run unit tests
+        run: dotnet test --configuration Release --no-build --no-restore Gateway.UnitTests/Gateway.UnitTests.csproj
+      - name: Run integration tests
+        run: dotnet test --configuration Release --no-build --no-restore Gateway.IntegrationTests/Gateway.IntegrationTests.csproj
