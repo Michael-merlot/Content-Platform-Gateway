@@ -44,13 +44,15 @@ public interface IAuthorizationManagementService
 
     /// <summary>Gets user roles.</summary>
     /// <param name="userId">The unique identifier of the user.</param>
+    /// <param name="useCache">Specifies whether to use cache when retrieving the value.</param>
     /// <returns>The collection of roles or an error.</returns>
-    Task<Result<IEnumerable<Role>, AuthorizationManagementError>> GetUserRolesAsync(int userId);
+    Task<Result<IEnumerable<Role>, AuthorizationManagementError>> GetUserRolesAsync(int userId, bool useCache = true);
 
     /// <summary>Gets user permissions.</summary>
     /// <param name="userId">The unique identifier of the user.</param>
+    /// <param name="useCache">Specifies whether to use cache when retrieving the value.</param>
     /// <returns>The collection of permissions or an error.</returns>
-    Task<Result<IEnumerable<Permission>, AuthorizationManagementError>> GetUserPermissionsAsync(int userId);
+    Task<Result<IEnumerable<Permission>, AuthorizationManagementError>> GetUserPermissionsAsync(int userId, bool useCache = true);
 
     /// <summary>Adds role to the user.</summary>
     /// <param name="userId">The unique identifier of the user.</param>
@@ -114,9 +116,10 @@ public interface IAuthorizationManagementService
     /// <param name="controller">The controller of the endpoint.</param>
     /// <param name="action">The action of the endpoint.</param>
     /// <param name="httpMethod">The HTTP method of the endpoint.</param>
+    /// <param name="useCache">Specifies whether to use cache when retrieving the value.</param>
     /// <returns>The collection of permissions or an error.</returns>
     Task<Result<IEnumerable<Permission>, AuthorizationManagementError>> GetEndpointPermissionRequirementsAsync(string controller,
-        string action, string httpMethod);
+        string action, string httpMethod, bool useCache = true);
 
     /// <summary>Adds permission requirement to the endpoint.</summary>
     /// <param name="endpointId">The unique identifier of the endpoint.</param>

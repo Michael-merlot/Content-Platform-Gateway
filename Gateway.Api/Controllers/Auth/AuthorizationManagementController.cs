@@ -177,7 +177,8 @@ public class AuthorizationManagementController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError, MediaTypeNames.Application.ProblemJson)]
     public async Task<IActionResult> GetUserRoles(int userId)
     {
-        Result<IEnumerable<Role>, AuthorizationManagementError> result = await _authorizationManagementService.GetUserRolesAsync(userId);
+        Result<IEnumerable<Role>, AuthorizationManagementError> result =
+            await _authorizationManagementService.GetUserRolesAsync(userId, false);
 
         return result.Match(value => Ok(value.ToAdminDto()),
             error => error.ToProblemDetails(this));

@@ -273,7 +273,7 @@ public sealed class AuthorizationManagementControllerTests
             }
         ];
 
-        _authService.GetUserRolesAsync(userId).Returns(roles);
+        _authService.GetUserRolesAsync(userId, Arg.Any<bool>()).Returns(roles);
 
         IActionResult result = await _controller.GetUserRoles(userId);
 
@@ -287,7 +287,7 @@ public sealed class AuthorizationManagementControllerTests
     {
         const int userId = 123;
 
-        _authService.GetUserRolesAsync(userId).Returns(AuthorizationManagementError.UserNotFound);
+        _authService.GetUserRolesAsync(userId, Arg.Any<bool>()).Returns(AuthorizationManagementError.UserNotFound);
 
         IActionResult result = await _controller.GetUserRoles(userId);
 
