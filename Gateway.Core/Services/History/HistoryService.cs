@@ -17,7 +17,7 @@ namespace Gateway.Core.Services.History
         }
 
         public async Task<IEnumerable<HistoryItem>> GetUserHistoryAsync(
-            Guid userId,
+            int userId,
             ContentType? contentType = null,
             int skip = 0,
             int take = 50)
@@ -25,7 +25,7 @@ namespace Gateway.Core.Services.History
             return await _historyRepository.GetByUserIdAsync(userId, contentType, skip, take);
         }
 
-        public async Task ClearUserHistoryAsync(Guid userId)
+        public async Task ClearUserHistoryAsync(int userId)
         {
             var userHistory = await _historyRepository.GetByUserIdAsync(userId);
             foreach (var item in userHistory)

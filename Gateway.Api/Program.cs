@@ -1,9 +1,11 @@
+using Gateway.Api.Auth;
 using Gateway.Api.Middleware;
-using Gateway.Api.Options;
+using Gateway.Core.Configuration;
 using Gateway.Core.Health;
 using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
 using Gateway.Core.Interfaces.History;
+using Gateway.Core.Models.Auth;
 using Gateway.Core.Interfaces.Persistence;
 using Gateway.Core.Interfaces.Cache;
 using Gateway.Core.Middleware;
@@ -13,6 +15,7 @@ using Gateway.Core.Services;
 using Gateway.Core.Services.Auth;
 using Gateway.Core.Services.History;
 using Gateway.Core.Services.Http;
+using Gateway.Infrastructure.Auth;
 using Gateway.Infrastructure.Extensions;
 using Gateway.Infrastructure.Monitoring;
 using Gateway.Infrastructure.Persistence.DistributedCache;
@@ -24,8 +27,10 @@ using Gateway.Infrastructure.Services.Cache;
 using Microsoft.Extensions.Caching.Memory;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -38,6 +43,9 @@ using StackExchange.Redis;
 using System.Reflection;
 using Gateway.Core.Interfaces.Subscriptions;
 using Gateway.Core.Services.Subscriptions;
+using Gateway.Infrastructure;
+using Gateway.Infrastructure.Persistence.Auth;
+
 using System.Net.Sockets;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -61,11 +69,32 @@ builder.Services.Configure<HostOptions>(options => {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 
-builder.Services.AddOptions<AuthOptions>().BindConfiguration("Auth");
+builder.Services.AddOptions<AuthOptions>()
+    .Bind(builder.Configuration.GetSection(AuthOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddDbContext<AuthDbContext>(options => options
+    .UseNpgsql(builder.Configuration.GetConnectionString(AuthDbContext.ConnectionStringName),
+        npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(IInfrastructureMarker).Assembly))
+    .UseSnakeCaseNamingConvention());
+
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IPermissionRepository, PermissionRepository>();
+builder.Services.AddScoped<IEndpointRepository, EndpointRepository>();
+builder.Services.AddScoped<IUserAuthorizationRepository, UserAuthorizationRepository>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IAuthorizationManagementService, AuthorizationManagementService>();
+
 builder.Services.AddScoped<IHistoryRepository, HistoryRepository>();
 builder.Services.AddScoped<IHistoryService, HistoryService>();
-builder.Services.AddControllers();
+
 builder.Services.AddMemoryCache();
+
+builder.Services.AddScoped<IAuthorizationHandler, DynamicPermissionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, AdminUntilDynamicPermissionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, DefaultDynamicPermissionHandler>();
+builder.Services.AddScoped<PermissionEnrichmentJwtBearerEvents>();
 
 builder.Services
     .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
@@ -74,9 +103,9 @@ builder.Services
         if (builder.Environment.IsDevelopment())
             options.RequireHttpsMetadata = false;
 
-        options.Authority = authOptions.Value.Authority;
+        options.Authority = authOptions.Value.Authority.ToString();
 
-        options.TokenValidationParameters = new TokenValidationParameters
+        TokenValidationParameters tokenValidationParameters = new()
         {
             ValidateIssuer = true,
             ValidateAudience = true,
@@ -84,10 +113,30 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+
+        if (builder.Environment.IsDevelopment() && authOptions.Value.UseLocalhostIssuerInDevelopment)
+        {
+            // This is synchronized with dev token issuance in IssueDevToken() in AuthenticationHandler
+            tokenValidationParameters.IssuerSigningKey = new SymmetricSecurityKey("do_not_use_this_key_in_production"u8.ToArray());
+            tokenValidationParameters.ValidIssuer = "localhost";
+            tokenValidationParameters.ValidAudience = "localhost";
+        }
+
+        options.TokenValidationParameters = tokenValidationParameters;
+
+        options.EventsType = typeof(PermissionEnrichmentJwtBearerEvents);
     })
     .Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
+
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(DynamicPermissionPolicies.RequireDynamicPermissionPolicy)
+    .AddPolicy(DynamicPermissionPolicies.RequireAdminPolicyName, DynamicPermissionPolicies.RequireAdminPolicy)
+    .AddPolicy(DynamicPermissionPolicies.RequireAdminUntilDynamicPolicyName, DynamicPermissionPolicies.RequireAdminUntilDynamicPolicy)
+    .AddPolicy(DynamicPermissionPolicies.RequireDynamicPermissionWithDefaultPolicyName, DynamicPermissionPolicies.RequireDynamicPermissionWithDefaultPolicy);
+
+builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -112,6 +161,8 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 
+    c.SupportNonNullableReferenceTypes();
+
     c.UseAllOfForInheritance();
     c.UseOneOfForPolymorphism();
 
@@ -120,10 +171,10 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = @"JWT авторизация. Введите 'Bearer' [пробел] и ваш токен.",
+        Description = "JWT аутентификация. Введите ваш токен без \"Bearer\".",
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
+        Type = SecuritySchemeType.Http,
         Scheme = "Bearer"
     });
 
@@ -146,7 +197,6 @@ builder.Services.AddSwaggerGen(c =>
     c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}");
 });
 
-builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddSingleton<MetricsReporter>();
 builder.Services.AddApplicationServices(builder.Configuration);
 
@@ -312,6 +362,14 @@ builder.Services.AddHttpClient<ResilientHttpClient>((sp, client) =>
 .AddHttpMessageHandler(() => new TimeoutHandler(TimeSpan.FromSeconds(10)));
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    using IServiceScope scope = app.Services.CreateScope();
+    AuthDbContext authDbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+
+    await authDbContext.Database.MigrateAsync();
+}
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -489,4 +547,3 @@ public class LocalCacheInvalidator : ICacheInvalidator
         return Task.CompletedTask;
     }
 }
-

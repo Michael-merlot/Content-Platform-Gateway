@@ -1,9 +1,11 @@
 namespace Gateway.Core.Models.Auth;
 
-/// <summary>Authentication error</summary>
-public enum AuthError
+/// <summary>Represents an authentication error.</summary>
+public enum AuthenticationError
 {
     None,
+    WrongCredentials,
+    IncorrectMfaCode,
     InvalidRequest,
     InvalidClient,
     InvalidGrant,

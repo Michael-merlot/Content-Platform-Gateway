@@ -1,3 +1,4 @@
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,15 +18,15 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="password">Пароль пользователя</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат аутентификации</returns>
-        Task<AuthResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
+        Task<Result<LoginResult, AuthenticationError>> LoginAsync(string email, string password, CancellationToken cancellationToken = default);
 
         /// <summary>Проверяет MFA код</summary>
         /// <param name="userId">ID пользователя</param>
         /// <param name="code">Код для проверки</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат проверки</returns>
-        Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(
-            string userId,
+        Task<Result<AuthenticatedTokenSession, AuthenticationError>> VerifyMultiFactorAsync(
+            int userId,
             string code,
             CancellationToken cancellationToken = default);
 
@@ -33,7 +34,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="refreshToken">Токен обновления</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат обновления токена</returns>
-        Task<AuthResult<AuthTokenSession>> RefreshAsync(
+        Task<Result<AuthenticatedTokenSession, AuthenticationError>> RefreshAsync(
             string refreshToken,
             CancellationToken cancellationToken = default);
 
@@ -41,7 +42,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="accessToken">Токен доступа</param>
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Результат выполнения операции</returns>
-        Task<AuthResult> LogoutAsync(
+        Task<Result<AuthenticationError>> LogoutAsync(
             string accessToken,
             CancellationToken cancellationToken = default);
 
@@ -50,7 +51,7 @@ namespace Gateway.Core.Interfaces.Clients
         /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>Информация о пользователе</returns>
         Task<UserProfileResponse?> GetUserProfileAsync(
-            string userId,
+            int userId,
             CancellationToken cancellationToken = default);
     }
 
@@ -59,7 +60,7 @@ namespace Gateway.Core.Interfaces.Clients
     /// </summary>
     public class UserProfileResponse
     {
-        public string Id { get; set; } = string.Empty;
+        public int Id { get; set; }
         public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string AvatarUrl { get; set; } = string.Empty;

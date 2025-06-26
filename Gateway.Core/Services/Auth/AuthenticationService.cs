@@ -1,5 +1,6 @@
 ﻿using Gateway.Core.Interfaces.Auth;
 using Gateway.Core.Interfaces.Clients;
+using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 
 namespace Gateway.Core.Services.Auth;
@@ -13,19 +14,36 @@ public class AuthenticationService : IAuthenticationService
         _apiClient = apiClient;
 
     /// <inheritdoc/>
-    public async Task<AuthResult<LoginResult>> LoginAsync(string email, string password, CancellationToken cancellationToken = default) =>
-        await _apiClient.LoginAsync(email, password, cancellationToken);
+    public async Task<Result<LoginResult, AuthenticationError>> LoginAsync(string email, string password,
+        CancellationToken cancellationToken = default)
+    {
+        if (email.Length > 256 || password.Length > 100)
+            return AuthenticationError.InvalidRequest;
+
+        return await _apiClient.LoginAsync(email, password, cancellationToken);
+    }
 
     /// <inheritdoc/>
-    public async Task<AuthResult<AuthTokenSession>> VerifyMultiFactorAsync(string userId, string code,
-        CancellationToken cancellationToken = default) =>
-        await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
+    public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> VerifyMultiFactorAsync(int userId, string code,
+        CancellationToken cancellationToken = default)
+    {
+        if (code.Length > 10)
+            return AuthenticationError.InvalidRequest;
+
+        return await _apiClient.VerifyMultiFactorAsync(userId, code, cancellationToken);
+    }
 
     /// <inheritdoc/>
-    public async Task<AuthResult<AuthTokenSession>> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
-        await _apiClient.RefreshAsync(refreshToken, cancellationToken);
+    public async Task<Result<AuthenticatedTokenSession, AuthenticationError>> RefreshAsync(string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (refreshToken.Length > 2000)
+            return AuthenticationError.InvalidRequest;
+
+        return await _apiClient.RefreshAsync(refreshToken, cancellationToken);
+    }
 
     /// <inheritdoc/>
-    public async Task<AuthResult> LogoutAsync(string accessToken, CancellationToken cancellationToken = default) =>
+    public async Task<Result<AuthenticationError>> LogoutAsync(string accessToken, CancellationToken cancellationToken = default) =>
         await _apiClient.LogoutAsync(accessToken, cancellationToken);
 }

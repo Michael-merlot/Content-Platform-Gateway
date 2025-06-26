@@ -1,5 +1,5 @@
 namespace Gateway.Core.Models.Auth;
 
-/// <summary>The metadata needed to verify MFA for a <paramref name="UserId"/></summary>
-/// <param name="UserId">The ID of a user who needs to be verified</param>
-public sealed record MfaVerificationMetadata(string UserId);
+/// <summary>Represents the metadata needed to verify MFA for a user.</summary>
+/// <param name="UserId">The unique identifier of the user to verify.</param>
+public sealed record MfaVerificationMetadata(int UserId);
