@@ -1,4 +1,5 @@
 using Gateway.Core.Interfaces.Auth;
+using Gateway.Core.Interfaces.Persistence;
 using Gateway.Core.Models;
 using Gateway.Core.Models.Auth;
 using Gateway.Core.Services.Auth;
@@ -17,11 +18,12 @@ public sealed class AuthorizationManagementServiceTests
     private readonly IPermissionRepository _permissionRepository = Substitute.For<IPermissionRepository>();
     private readonly IEndpointRepository _endpointRepository = Substitute.For<IEndpointRepository>();
     private readonly IUserAuthorizationRepository _userAuthorizationRepository = Substitute.For<IUserAuthorizationRepository>();
+    private readonly IDistributedCacheService _cache = Substitute.For<IDistributedCacheService>();
     private readonly AuthorizationManagementService _service;
 
     public AuthorizationManagementServiceTests() =>
         _service = new AuthorizationManagementService(_roleRepository, _permissionRepository, _endpointRepository,
-            _userAuthorizationRepository);
+            _userAuthorizationRepository, _cache);
 
     [Fact]
     public async Task GetRoleAsync_RepositorySuccess_ReturnsRole()
@@ -273,7 +275,7 @@ public sealed class AuthorizationManagementServiceTests
 
         _userAuthorizationRepository.GetUserRolesAsync(userId).Returns(expectedRoles);
 
-        Result<IEnumerable<Role>, AuthorizationManagementError> result = await _service.GetUserRolesAsync(userId);
+        Result<IEnumerable<Role>, AuthorizationManagementError> result = await _service.GetUserRolesAsync(userId, false);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.ShouldNotBeNull().ToArray().ShouldBe(expectedRoles);
@@ -286,7 +288,7 @@ public sealed class AuthorizationManagementServiceTests
 
         _userAuthorizationRepository.GetUserRolesAsync(userId).Returns(AuthorizationManagementError.UserNotFound);
 
-        Result<IEnumerable<Role>, AuthorizationManagementError> result = await _service.GetUserRolesAsync(userId);
+        Result<IEnumerable<Role>, AuthorizationManagementError> result = await _service.GetUserRolesAsync(userId, false);
 
         result.IsSuccess.ShouldBeFalse();
         result.Error.ShouldBe(AuthorizationManagementError.UserNotFound);
@@ -304,7 +306,7 @@ public sealed class AuthorizationManagementServiceTests
 
         _userAuthorizationRepository.GetUserPermissionsAsync(userId).Returns(expectedPermissions);
 
-        Result<IEnumerable<Permission>, AuthorizationManagementError> result = await _service.GetUserPermissionsAsync(userId);
+        Result<IEnumerable<Permission>, AuthorizationManagementError> result = await _service.GetUserPermissionsAsync(userId, false);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.ShouldNotBeNull().ToArray().ShouldBe(expectedPermissions);
@@ -317,7 +319,7 @@ public sealed class AuthorizationManagementServiceTests
 
         _userAuthorizationRepository.GetUserPermissionsAsync(userId).Returns(AuthorizationManagementError.UserNotFound);
 
-        Result<IEnumerable<Permission>, AuthorizationManagementError> result = await _service.GetUserPermissionsAsync(userId);
+        Result<IEnumerable<Permission>, AuthorizationManagementError> result = await _service.GetUserPermissionsAsync(userId, false);
 
         result.IsSuccess.ShouldBeFalse();
         result.Error.ShouldBe(AuthorizationManagementError.UserNotFound);
@@ -743,7 +745,7 @@ public sealed class AuthorizationManagementServiceTests
         _endpointRepository.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod).Returns(expectedPermissions);
 
         Result<IEnumerable<Permission>, AuthorizationManagementError> result =
-            await _service.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod);
+            await _service.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod, false);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.ShouldNotBeNull().ToArray().ShouldBe(expectedPermissions);
@@ -760,7 +762,7 @@ public sealed class AuthorizationManagementServiceTests
             .Returns(AuthorizationManagementError.EndpointNotFound);
 
         Result<IEnumerable<Permission>, AuthorizationManagementError> result =
-            await _service.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod);
+            await _service.GetEndpointPermissionRequirementsAsync(controller, action, httpMethod, false);
 
         result.IsSuccess.ShouldBeFalse();
         result.Error.ShouldBe(AuthorizationManagementError.EndpointNotFound);
