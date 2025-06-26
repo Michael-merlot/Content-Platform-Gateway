@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Mime;
 using System.Security.Claims;
@@ -161,6 +162,7 @@ public class AuthenticationController : ControllerBase
     /// <returns>The issued token.</returns>
     [HttpPost]
     [ProducesResponseType<string>(StatusCodes.Status200OK, MediaTypeNames.Text.Plain)]
+    [ExcludeFromCodeCoverage]
     public IActionResult IssueDevToken()
     {
         // Additional check just in case
