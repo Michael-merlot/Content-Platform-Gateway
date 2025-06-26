@@ -18,7 +18,7 @@ namespace Gateway.Infrastructure.Persistence.MultiLevel
             _distributedCache = distributedCache;
         }
 
-        public async Task<T> GetAsync<T>(string key) where T : class
+        public async Task<T?> GetAsync<T>(string key)
         {
             var value = await _memoryCache.GetAsync<T>(key);
             if (value != null) return value;
@@ -30,7 +30,7 @@ namespace Gateway.Infrastructure.Persistence.MultiLevel
             return value;
         }
 
-        public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class
+        public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
         {
             await _memoryCache.SetAsync(key, value, expiration);
             await _distributedCache.SetAsync(key, value, expiration);

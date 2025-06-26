@@ -25,7 +25,7 @@ namespace Gateway.Infrastructure.Persistence.Memory
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public Task<T?> GetAsync<T>(string key) where T : class
+        public Task<T?> GetAsync<T>(string key)
         {
             if (_memoryCache.TryGetValue(key, out var value) && value is T typed)
             {
@@ -34,10 +34,10 @@ namespace Gateway.Infrastructure.Persistence.Memory
             }
 
             _logger.LogDebug("Cache(Memory) miss for key {Key}", key);
-            return Task.FromResult<T?>(null);
+            return Task.FromResult<T?>(default);
         }
 
-        public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class
+        public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
         {
             var options = new MemoryCacheEntryOptions();
             if (expiration.HasValue)
