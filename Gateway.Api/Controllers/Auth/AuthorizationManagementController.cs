@@ -8,6 +8,7 @@ using Gateway.Core.Models.Auth;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Mime;
 
 using Endpoint = Gateway.Core.Models.Auth.Endpoint;
@@ -335,6 +336,7 @@ public class AuthorizationManagementController : ControllerBase
     /// <response code="200">The collection of framework endpoints.</response>
     [HttpGet("endpoints/framework")]
     [ProducesResponseType<FrameworkEndpointCollectionResponse>(StatusCodes.Status200OK, MediaTypeNames.Application.Json)]
+    [ExcludeFromCodeCoverage]
     public IActionResult GetFrameworkEndpoints() =>
         Ok(_endpointSources.SelectMany(x => x.Endpoints)
             .Select(x => (Cad: x.Metadata.GetMetadata<ControllerActionDescriptor>(), Hmm: x.Metadata.GetMetadata<HttpMethodMetadata>()))
