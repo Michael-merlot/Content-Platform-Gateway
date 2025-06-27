@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Gateway.Core.Interfaces.Notifications;
 //using Gateway.Core.DTOs.Notifications; // Используем DTO из Core
-using Gateway.Api.Models.Notifications; // Используем модели запросов из Api
+using Gateway.Api.Models.Notifications;
 
 namespace Gateway.Api.Controllers;
 
@@ -23,6 +23,7 @@ public class NotificationsController : ControllerBase
     /// <summary>
     /// Получить уведомления для текущего пользователя.
     /// </summary>
+    /// <param name="userId"></param>
     /// <param name="isRead">Фильтр по статусу прочитано/не прочитано (опционально).</param>
     /// <returns>Список уведомлений.</returns>
     [HttpGet]
@@ -48,7 +49,7 @@ public class NotificationsController : ControllerBase
             await _notificationService.MarkNotificationAsReadAsync(notificationId, userId);
             return NoContent();
         }
-        catch (InvalidOperationException ex) // Можете использовать NotificationException
+        catch (InvalidOperationException ex)
         {
             return NotFound(ex.Message);
         }

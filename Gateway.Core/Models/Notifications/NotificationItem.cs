@@ -4,24 +4,38 @@ namespace Gateway.Core.Models.Notifications;
 
 public abstract class NotificationItem
 {
-    public Guid Id { get; set; }
-    public string UserId { get; set; }
-    public string Type { get; set; } // Тип уведомления
-    public string Message { get; set; }
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public bool IsRead { get; set; } = false;
-    public string? TargetUrl { get; set; } // URL, куда ведет уведомление (необязательно)
+    public Guid Id { get; protected set; }
+    public Guid UserId { get; protected set; }
+    public string Type { get; protected set; } // Тип уведомления
+    public string Message { get; protected set; }
+    public DateTimeOffset CreatedAt { get; protected set; } = DateTimeOffset.UtcNow;
+    public bool IsRead { get; protected set; } = false;
 
-    // Конструктор для EF Core и инициализации
-    protected NotificationItem(string userId, string type, string message, string? targetUrl = null)
+    // Приватный конструктор для EF Core
+    protected NotificationItem()
     {
-        Id = Guid.NewGuid();
-        UserId = userId ?? throw new ArgumentNullException(nameof(userId));
-        Type = type ?? throw new ArgumentNullException(nameof(type));
-        Message = message ?? throw new ArgumentNullException(nameof(message));
-        TargetUrl = targetUrl;
+        // Устанавливаем CreatedAt и IsRead значения по умолчанию здесь
+        CreatedAt = DateTimeOffset.UtcNow;
+        IsRead = false;
     }
 
-    // Для EF Core, чтобы он мог создавать экземпляры
-    protected NotificationItem() { }
+    // Защищенный конструктор для инициализации из дочерних классов
+    protected NotificationItem(Guid userId, string type, string message)
+    {
+        Id = Guid.NewGuid();
+        UserId = userId;
+        Type = type;
+        Message = message ?? throw new ArgumentNullException(nameof(message));
+        CreatedAt = DateTimeOffset.UtcNow;
+        IsRead = false;
+    }
+    public void MarkAsRead()
+    {
+        IsRead = true;
+    }
+
+    public void MarkAsUnread()
+    {
+        IsRead = false;
+    }
 }
