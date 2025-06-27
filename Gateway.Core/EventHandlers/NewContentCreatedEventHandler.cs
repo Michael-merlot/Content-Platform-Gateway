@@ -4,7 +4,6 @@ using Gateway.Core.Models.Notifications;
 
 namespace Gateway.Core.EventHandlers;
 
-// В реальном приложении, этот класс будет обработчиком события (например, через MediatR)
 public class NewContentCreatedEventHandler
 {
     private readonly INotificationService _notificationService;
@@ -30,7 +29,7 @@ public class NewContentCreatedEventHandler
                 );
             }
         }
-        // Также можно отправить уведомление для администратора или для "всех"
+        // можно отправить уведомление, потом продумать
         // await _notificationService.CreateAndSendNotificationAsync(Guid.NewGuid(), $"Новый контент создан: {@event.ContentTitle}", NotificationType.SystemEvent);
     }
 }
